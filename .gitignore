@@ -8,7 +8,6 @@ __pycache__/
 dist/
 build/
 outputs/
-resultados/
 work/
 Samples/
 *.zip

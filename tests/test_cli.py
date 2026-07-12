@@ -1,6 +1,6 @@
 from typer.testing import CliRunner
 
-from atlas_splitter.cli import app
+from atlas_splitter.cli import app, translate_simple_args
 
 runner = CliRunner()
 
@@ -61,3 +61,14 @@ def test_cli_creates_and_inspects_zip(tmp_path) -> None:
     inspected = runner.invoke(app, ["inspect", str(archive)])
     assert inspected.exit_code == 0
     assert "1 elementos" in inspected.stdout
+
+
+def test_simple_command_translates_output_and_calibration() -> None:
+    arguments = translate_simple_args(["atlas.webp", "simple-output", "--calibration-pixels", "4"])
+    assert arguments == ["run", "atlas.webp", "--output", "simple-output", "--calibration-pixels", "4"]
+
+
+def test_install_help_is_available_without_installing_dependencies() -> None:
+    result = runner.invoke(app, ["install", "--help"])
+    assert result.exit_code == 0
+    assert "PyTorch" in result.stdout

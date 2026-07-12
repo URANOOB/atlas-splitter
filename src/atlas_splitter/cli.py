@@ -1,5 +1,6 @@
 """Interfaz de línea de comandos de atlas-splitter."""
 
+import sys
 from pathlib import Path
 from typing import Annotated
 
@@ -7,10 +8,12 @@ import typer
 from pydantic import ValidationError
 from rich.console import Console
 from rich.table import Table
+from typer.main import get_command
 
 from atlas_splitter.config import apply_cli_overrides, load_config
 from atlas_splitter.diagnostics import collect_diagnostics, has_critical_failures
 from atlas_splitter.exceptions import AtlasSplitterError
+from atlas_splitter.installer import InstallationError, install_runtime
 from atlas_splitter.io.image_loader import ImageLoadError, discover_images
 from atlas_splitter.io.zip_writer import write_zip
 from atlas_splitter.models.manager import download_model as fetch_model
@@ -100,7 +103,9 @@ def run(
         raise typer.BadParameter(str(error), param_hint="source") from error
     if not images:
         raise typer.BadParameter("No se encontraron archivos WEBP válidos.", param_hint="source")
-    output_root = output or Path("resultados")
+    output_root = output or Path("outputs")
+    if output is None:
+        console.print("[cyan]Salida predeterminada:[/cyan] outputs/")
     failures = 0
     completed: list[Path] = []
     sam_engine = Sam2Engine(
@@ -134,6 +139,37 @@ def run(
         except OSError as error:
             console.print(f"[red]No se pudo crear el ZIP: {error}[/red]")
             raise typer.Exit(code=1) from error
+
+
+def translate_simple_args(arguments: list[str]) -> list[str]:
+    """Traduce ``atlas-splitter archivo [salida]`` a la interfaz avanzada."""
+    commands = {"doctor", "install", "inspect", "models", "run"}
+    if not arguments or arguments[0] in commands or arguments[0].startswith("-"):
+        return arguments
+    translated = ["run", arguments[0]]
+    remaining = arguments[1:]
+    if remaining and not remaining[0].startswith("-"):
+        translated.extend(("--output", remaining[0]))
+        remaining = remaining[1:]
+    return [*translated, *remaining]
+
+
+def main() -> None:
+    """Punto de entrada que conserva subcomandos y ofrece la sintaxis corta."""
+    get_command(app).main(args=translate_simple_args(sys.argv[1:]), prog_name="atlas-splitter")
+
+
+@app.command()
+def install(
+    model: Annotated[str, typer.Option(help="Checkpoint SAM 2 que se descargará")] = "sam2-small",
+) -> None:
+    """Prepara PyTorch CUDA, SAM 2 y el checkpoint en WSL/Linux."""
+    console.print("Instalando PyTorch CUDA, SAM 2 y el checkpoint local. Esto puede tardar varios minutos.")
+    try:
+        checkpoint = install_runtime(model)
+    except (InstallationError, OSError, ValueError) as error:
+        raise typer.BadParameter(str(error), param_hint="--model") from error
+    console.print(f"[green]Instalación lista:[/green] {checkpoint}")
 
 
 @models_app.command("list")

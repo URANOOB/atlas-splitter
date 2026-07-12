@@ -34,7 +34,8 @@ dev = [
 ]
 
 [project.scripts]
-atlas-split = "atlas_splitter.cli:app"
+atlas-split = "atlas_splitter.cli:main"
+atlas-splitter = "atlas_splitter.cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
