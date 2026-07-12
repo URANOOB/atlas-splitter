@@ -1,0 +1,25 @@
+device: auto
+model: sam2-small
+
+segmentation:
+  confidence: 0.88
+  stability: 0.92
+  min_area: 400
+  max_area_ratio: 0.45
+  duplicate_iou: 0.80
+  preserve_small: true
+  sam2_points_per_side: 16
+  sam2_points_per_batch: 16
+  sam2_edge_padding: 4
+
+processing:
+  padding: 16
+  crop_elements: false
+  use_mixed_precision: true
+
+output:
+  include_psd: true
+  include_png: true
+  include_masks: true
+  create_contact_sheet: true
+  create_zip: true
