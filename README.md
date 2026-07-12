@@ -3,6 +3,16 @@
 Convierte un atlas WEBP plano en elementos reutilizables: PNG, máscara, PSD,
 manifiesto, hoja de contacto y ZIP. Todo se procesa localmente.
 
+## Ejemplo visual
+
+| Atlas original | Elemento extraído |
+| --- | --- |
+| ![Atlas original](docs/examples/atlas-original.png) | ![Elemento separado con transparencia](docs/examples/atlas-extraido.png) |
+
+El programa identifica una región, conserva sus píxeles visibles y la exporta
+como PNG, máscara y PSD. Si un borde necesita corrección, se ajusta con
+`--calibration-pixels`.
+
 ## Para qué sirve
 
 Cuando solo existe un atlas final y se perdió el PSD original, `atlas-splitter`
