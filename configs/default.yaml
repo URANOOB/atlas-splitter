@@ -23,3 +23,14 @@ output:
   include_masks: true
   create_contact_sheet: true
   create_zip: true
+
+grouping:
+  enabled: false
+  backend: qwen3-vl
+  model: qwen3-vl-2b
+  device: auto
+  minimum_confidence: 0.70
+  automatic_confidence: 0.80
+  max_pieces_per_sheet: 25
+  naming_language: en
+  keep_semantic_inputs: false

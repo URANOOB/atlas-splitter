@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class SegmentationConfig(BaseModel):
@@ -44,6 +44,27 @@ class OutputConfig(BaseModel):
     create_zip: bool = True
 
 
+class GroupingConfig(BaseModel):
+    """Opciones de la agrupación semántica, desactivada por defecto."""
+
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = False
+    backend: Literal["qwen3-vl"] = "qwen3-vl"
+    model: Literal["qwen3-vl-2b"] = "qwen3-vl-2b"
+    device: Literal["auto", "cpu", "cuda"] = "auto"
+    minimum_confidence: float = Field(default=0.70, ge=0.0, le=1.0)
+    automatic_confidence: float = Field(default=0.80, ge=0.0, le=1.0)
+    max_pieces_per_sheet: int = Field(default=25, ge=1)
+    naming_language: Literal["en"] = "en"
+    keep_semantic_inputs: bool = False
+
+    @model_validator(mode="after")
+    def _validate_confidence_order(self) -> "GroupingConfig":
+        if self.automatic_confidence < self.minimum_confidence:
+            raise ValueError("automatic_confidence no puede ser menor que minimum_confidence")
+        return self
+
+
 class AppConfig(BaseModel):
     """Configuración completa, con valores seguros para el MVP."""
 
@@ -53,6 +74,7 @@ class AppConfig(BaseModel):
     segmentation: SegmentationConfig = Field(default_factory=SegmentationConfig)
     processing: ProcessingConfig = Field(default_factory=ProcessingConfig)
     output: OutputConfig = Field(default_factory=OutputConfig)
+    grouping: GroupingConfig = Field(default_factory=GroupingConfig)
 
 
 def load_config(path: Path | None = None) -> AppConfig:

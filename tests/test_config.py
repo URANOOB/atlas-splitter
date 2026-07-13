@@ -19,3 +19,8 @@ def test_cli_values_override_config() -> None:
     config = apply_cli_overrides(load_config(), {"device": "cpu", "segmentation.min_area": 12})
     assert config.device == "cpu"
     assert config.segmentation.min_area == 12
+
+
+def test_grouping_rejects_inverted_confidence_thresholds() -> None:
+    with pytest.raises(ValidationError):
+        AppConfig.model_validate({"grouping": {"minimum_confidence": 0.9, "automatic_confidence": 0.8}})
