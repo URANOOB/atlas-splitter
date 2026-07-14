@@ -57,3 +57,27 @@ def test_extracted_atlas_groups_with_a_deterministic_fake_backend(tmp_path) -> N
     assert (destination / "objects" / "objects_001" / "element_001.png").is_file()
     assert (destination / "grouped" / "objects_001.psd").is_file()
     assert not (destination / "semantic_inputs").exists()
+
+
+def test_semantic_manifest_is_reproducible_with_the_same_fake_result(tmp_path) -> None:
+    source = tmp_path / "atlas.webp"
+    Image.new("RGBA", (20, 20), (255, 0, 0, 255)).save(source, "WEBP", lossless=True)
+    config = AppConfig.model_validate(
+        {"segmentation": {"min_area": 20}, "grouping": {"enabled": True, "device": "cpu"}}
+    )
+    expected = GroupingResult(
+        [SemanticGroup("object_001", "object", "object", ["E001"], 0.9, "accepted")],
+        [],
+        "fake",
+        "deterministic",
+        0.0,
+    )
+    first = process_image(source, tmp_path / "first", config)
+    second = process_image(source, tmp_path / "second", config)
+
+    group_extracted_atlas(first, config.grouping, FakeSemanticGroupingBackend(expected))
+    group_extracted_atlas(second, config.grouping, FakeSemanticGroupingBackend(expected))
+
+    assert json.loads((first / "semantic_manifest.json").read_text(encoding="utf-8")) == json.loads(
+        (second / "semantic_manifest.json").read_text(encoding="utf-8")
+    )
