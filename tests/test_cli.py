@@ -20,6 +20,20 @@ def test_new_modes_expose_help() -> None:
     assert "--uv-set" in semantic_3d_help.stdout
 
 
+def test_debug_is_a_global_cli_option() -> None:
+    result = runner.invoke(app, ["--debug", "--help"])
+    assert result.exit_code == 0
+    assert "--debug" in result.stdout
+
+
+def test_glb_error_exposes_a_stable_code_without_traceback(tmp_path) -> None:
+    result = runner.invoke(app, ["glb", str(tmp_path / "missing.gltf")])
+    assert result.exit_code != 0
+    assert "AS-GLB-002" in result.stderr
+    assert "Causa probable:" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
 def test_run_rejects_a_missing_source(tmp_path) -> None:
     result = runner.invoke(app, ["run", str(tmp_path / "atlas.webp")])
     assert result.exit_code != 0

@@ -1,5 +1,6 @@
 """Interfaz de línea de comandos de atlas-splitter."""
 
+import logging
 import sys
 from pathlib import Path
 from typing import Annotated, cast
@@ -49,6 +50,16 @@ semantic_models_app = typer.Typer(help="Gestiona modelos semánticos locales.", 
 app.add_typer(models_app, name="models")
 app.add_typer(semantic_models_app, name="semantic-models")
 console = Console()
+LOGGER = logging.getLogger(__name__)
+
+
+@app.callback()
+def common_options(
+    debug: Annotated[bool, typer.Option("--debug", help="Muestra traceback completo si ocurre un error.")] = False,
+) -> None:
+    """Opciones comunes; el traceback se reserva para depuracion explicita."""
+    if debug:
+        LOGGER.info("Modo de depuracion CLI activado.")
 
 
 def _planned(command: str) -> None:
@@ -427,7 +438,17 @@ def main() -> None:
             get_command(app).main(args=["--help"], prog_name="atlas-splitter")
             return
         arguments = interactive_arguments(Path.cwd())
-    get_command(app).main(args=translate_simple_args(arguments), prog_name="atlas-splitter")
+    debug = "--debug" in arguments
+    try:
+        get_command(app).main(args=translate_simple_args(arguments), prog_name="atlas-splitter", standalone_mode=False)
+    except typer.Exit as error:
+        raise SystemExit(error.exit_code) from error
+    except Exception as error:
+        if debug:
+            console.print_exception()
+        else:
+            console.print(f"[red]Error: {error}[/red]\nUsa --debug para ver el traceback.")
+        raise SystemExit(1) from error
 
 
 @app.command()
