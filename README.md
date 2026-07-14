@@ -35,6 +35,12 @@ atlas-splitter semantic-3d GLB/Room.glb Samples/day/first-house_day.webp --outpu
 
 Agrupa primero por conectividad y proximidad 3D; Qwen3-VL local sólo etiqueta las propuestas resultantes. No hace Join de las mallas.
 
+### Resultado editable en Blender
+
+La reconstrucción semántica conserva los componentes como mallas editables bajo padres de grupo. En este ejemplo de First House, las piezas resultantes quedan separadas y organizadas en el Outliner, listas para inspección o edición individual:
+
+![First House separado en objetos editables dentro de Blender](docs/assets/semantic-first-house-separated.png)
+
 ## Configuración
 
 Puedes usar YAML opcional para ajustar bordes en atlas sin GLB:
