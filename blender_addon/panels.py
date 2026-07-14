@@ -15,6 +15,7 @@ else:
         def draw(self, context):
             layout = self.layout
             layout.operator("atlas_splitter.load_project", icon="FILE_FOLDER")
+            layout.operator("atlas_splitter.create_review_collections", icon="OUTLINER_COLLECTION")
             path = context.scene.get("atlas_splitter_project")
             if path:
                 layout.label(text=path)
