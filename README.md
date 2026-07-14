@@ -14,7 +14,7 @@ atlas-splitter
 
 Consulta las guías de [inicio rápido](docs/quick-start.md), [instalación en Windows](docs/windows-installation.md), [GLB y UV](docs/glb-and-uv-workflow.md) y [solución de problemas](docs/troubleshooting.md).
 
-El asistente pregunta si tienes un GLB/glTF o sólo atlas WEBP, pide las rutas de entrada y salida, y crea `atlas-splitter.yaml` editable para el modo sin geometría.
+El asistente ofrece atlas 2D, atlas+GLB/UV, `doctor` y modelos locales; valida rutas, permite volver al menú, muestra un resumen y devuelve el comando reproducible. El flujo básico no exige editar YAML.
 
 ## Dos modos
 
@@ -35,7 +35,7 @@ Agrupa primero por conectividad y proximidad 3D; Qwen3-VL local sólo etiqueta l
 
 ## Configuración
 
-El asistente crea un YAML inicial. Ejemplo para ajustar bordes en atlas sin GLB:
+Puedes usar YAML opcional para ajustar bordes en atlas sin GLB:
 
 ```yaml
 device: cuda
@@ -45,14 +45,14 @@ segmentation:
   sam2_edge_padding: 4
 ```
 
-CUDA es el valor predeterminado cuando está disponible. Usa `--device cpu` si necesitas forzarlo.
+Usa `--device auto` para escoger CUDA cuando esté disponible o CPU de forma segura; `--device cpu` fuerza CPU.
 
 ## Comandos directos
 
 ```text
 atlas-splitter atlas.webp resultados
 atlas-splitter run ./atlases --recursive --output resultados --calibration-pixels 4
-atlas-splitter glb modelo.glb --atlas-dir ./atlases --allow-unbound-atlas --output resultados
+atlas-splitter glb modelo.glb --atlas-dir ./atlases --output resultados
 atlas-splitter doctor
 atlas-splitter models list
 atlas-splitter semantic-models list
@@ -114,3 +114,16 @@ python -m pytest
 python -m ruff check .
 python -m mypy
 ```
+
+## Documentación
+
+- [Inicio rápido](docs/quick-start.md)
+- [GLB, UV y bindings](docs/glb-and-uv-workflow.md)
+- [Salida generada](docs/output-structure.md)
+- [Flujo Blender](docs/blender-workflow.md)
+- [Agrupación semántica](docs/semantic-grouping.md)
+- [Solución de problemas](docs/troubleshooting.md)
+
+## Privacidad y límites
+
+Las imágenes, GLB, manifiestos y modelos permanecen en el equipo. La calidad 2D depende de la segmentación visual; con GLB/UV se preserva la geometría declarada, pero un atlas externo ambiguo requiere confirmación. Las etiquetas semánticas son inferencias y se marcan como tales en sus manifiestos.
