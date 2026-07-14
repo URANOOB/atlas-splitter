@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from dataclasses import replace
 from pathlib import Path
 from typing import Literal, cast
 
@@ -19,6 +20,8 @@ from atlas_splitter.domain import (
     SceneManifest,
     UvIsland,
     UvManifest,
+    slugify,
+    stable_element_id,
     write_versioned_manifest,
 )
 from atlas_splitter.exceptions import GltfLoadError, PrimitiveDecodeError
@@ -50,6 +53,8 @@ def export_glb(
     allow_unbound_atlas: bool = False,
     node_indices: set[int] | None = None,
     flip_v: bool = False,
+    uv_set: int | None = None,
+    force_external_atlas: bool = False,
 ) -> UvManifest:
     """Escribe máscaras UV, recortes, manifiestos y el script de reconstrucción."""
     primitives = decode_scene_primitives(loaded)
@@ -60,7 +65,7 @@ def export_glb(
         if node_indices is not None and primitive.reference.node_index not in node_indices:
             continue
         binding = _primary_binding(loaded, primitive.reference.material_index, texture_slot, texture_index)
-        manual_atlas = binding is None and selected_atlas is not None and allow_unbound_atlas
+        manual_atlas = selected_atlas is not None and (force_external_atlas or (binding is None and allow_unbound_atlas))
         if manual_atlas:
             binding = TextureBinding(
                 slot=cast("TextureSlot", texture_slot),
@@ -75,6 +80,8 @@ def export_glb(
         if binding is None:
             LOGGER.warning("Se omite %s: no hay textura %s asociada al material.", primitive.reference, texture_slot)
             continue
+        if uv_set is not None:
+            binding = replace(binding, texcoord=uv_set)
         override = (
             _verified_external_atlas(selected_atlas, loaded, binding)
             if selected_atlas and not manual_atlas
@@ -85,7 +92,7 @@ def export_glb(
         if binding.texcoord not in primitive.texcoords:
             raise PrimitiveDecodeError(f"La primitiva {primitive.reference} no contiene TEXCOORD_{binding.texcoord}.")
         uvs = primitive.texcoords[binding.texcoord]
-        groups = _groups(primitive.triangle_indices, group_by)
+        groups = _groups(primitive.triangle_indices, group_by, uvs)
         for group_index, triangle_rows in enumerate(groups):
             triangles = primitive.triangle_indices[triangle_rows]
             transformed = _flip_v(binding.transform.apply(uvs)) if flip_v else binding.transform.apply(uvs)
@@ -124,6 +131,8 @@ def export_glb(
                     }
                 )
             )
+    if group_by in {"node", "mesh"}:
+        elements = _coalesce_elements(loaded, destination, elements, selected_atlas, group_by)
     if not elements:
         raise GltfLoadError("No se exportó ninguna región: no hay asociaciones material/textura/UV compatibles.")
     first_image = _image_for_dimensions(loaded, elements[0].image_index, selected_atlas)
@@ -146,6 +155,116 @@ def export_glb(
     write_rebuild_script(destination / "blender" / "rebuild_scene.py", loaded.source_path, destination / "uv_manifest.json")
     LOGGER.info("Exportadas %s regiones UV en %s", len(elements), destination)
     return manifest
+
+
+def _coalesce_elements(
+    loaded: LoadedGltf,
+    destination: Path,
+    elements: list[AtlasElement],
+    atlas: Path | None,
+    group_by: Literal["node", "mesh"],
+) -> list[AtlasElement]:
+    """Combina las máscaras de primitivas de un nodo o una malla de forma estable.
+
+    Un elemento UV sólo puede describir un material y una imagen. En vez de elegir
+    uno arbitrariamente, los grupos que mezclan materiales se rechazan con una
+    instrucción clara para usar ``primitive``/``uv-island`` o seleccionar un slot.
+    """
+    grouped: dict[int, list[AtlasElement]] = {}
+    for element in elements:
+        key = element.node_index if group_by == "node" else element.mesh_index
+        grouped.setdefault(key, []).append(element)
+    result: list[AtlasElement] = []
+    for key, members in sorted(grouped.items()):
+        if len(members) == 1:
+            result.append(members[0].model_copy(update={"source_primitives": [_primitive_record(members[0])]}))
+            continue
+        first = members[0]
+        material_signature = {
+            (item.material_index, item.image_index, item.texture_index, item.texcoord) for item in members
+        }
+        if len(material_signature) != 1:
+            # Un elemento UV representa un único material. Mezclarlos produciría
+            # una máscara aparentemente válida pero recortes y mapas auxiliares
+            # falsos. Conservamos por tanto cada primitiva/material dentro del
+            # mismo grupo lógico (node o mesh), con toda su procedencia.
+            for item in members:
+                result.append(
+                    item.model_copy(
+                        update={
+                            "source_primitives": [_primitive_record(item)],
+                            "warnings": [
+                                *item.warnings,
+                                f"El grupo {group_by}={key} usa varios materiales; esta región se conserva "
+                                "por material para no perder mapas auxiliares.",
+                            ],
+                        }
+                    )
+                )
+            continue
+        mask, box = _combined_mask(destination, members)
+        image = _external_image(atlas) if atlas is not None else read_texture_image(loaded, first.image_index or 0)
+        x, y, width, height = box
+        pixels = np.asarray(image.convert("RGBA")).copy()
+        pixels[:, :, 3] = np.where(mask, pixels[:, :, 3], 0)
+        element_id = stable_element_id(0, first.node_index, first.mesh_index, -1, f"{group_by}-{key}")
+        element_dir = destination / "materials" / element_id
+        element_dir.mkdir(parents=True, exist_ok=True)
+        crop = element_dir / "baseColor.png"
+        Image.fromarray(pixels[y : y + height, x : x + width], "RGBA").save(crop)
+        mask_path = destination / "masks" / f"{element_id}.png"
+        Image.fromarray((mask * 255).astype(np.uint8), "L").save(mask_path)
+        files = dict(first.exported_files)
+        files["baseColor"] = str(crop.relative_to(destination).as_posix())
+        files["uv_mask"] = str(mask_path.relative_to(destination).as_posix())
+        source_primitives = [_primitive_record(item) for item in members]
+        original_uvs = [uv for item in members for uv in item.original_uvs]
+        transformed_uvs = [uv for item in members for uv in item.transformed_uvs]
+        triangles = [triangle for item in members for triangle in item.triangle_indices]
+        result.append(
+            first.model_copy(
+                update={
+                    "element_id": element_id,
+                    "slug": slugify(f"{first.original_name}-{group_by}-{key}"),
+                    "original_uvs": original_uvs,
+                    "transformed_uvs": transformed_uvs,
+                    "triangle_indices": triangles,
+                    "bounding_box": BoundingBox(x=x, y=y, width=width, height=height),
+                    "uv_islands": [island for item in members for island in item.uv_islands],
+                    "exported_files": files,
+                    "source_primitives": source_primitives,
+                    "warnings": [
+                        *first.warnings,
+                        f"Máscara combinada de {len(members)} primitivas por {group_by}; los archivos auxiliares "
+                        "de materiales secundarios conservan la primera primitiva.",
+                    ],
+                }
+            )
+        )
+    return result
+
+
+def _primitive_record(element: AtlasElement) -> dict[str, int | None]:
+    return {
+        "node_index": element.node_index,
+        "mesh_index": element.mesh_index,
+        "primitive_index": element.primitive_index,
+        "material_index": element.material_index,
+    }
+
+
+def _combined_mask(destination: Path, members: list[AtlasElement]) -> tuple[np.ndarray, tuple[int, int, int, int]]:
+    masks: list[np.ndarray] = []
+    for member in members:
+        path = destination / member.exported_files["uv_mask"]
+        with Image.open(path) as source:
+            masks.append(np.asarray(source.convert("L"), dtype=np.uint8) > 0)
+    mask = np.logical_or.reduce(masks)
+    rows, columns = np.nonzero(mask)
+    if not len(rows):
+        raise GltfLoadError("No se pudo combinar un grupo UV sin píxeles activos.")
+    x, y = int(columns.min()), int(rows.min())
+    return mask, (x, y, int(columns.max()) - x + 1, int(rows.max()) - y + 1)
 
 
 def _primary_binding(loaded: LoadedGltf, material_index: int | None, slot: str, texture_index: int | None) -> TextureBinding | None:
@@ -205,8 +324,8 @@ def _flip_v(uvs: np.ndarray) -> np.ndarray:
     return flipped
 
 
-def _groups(triangles: np.ndarray, group_by: GroupBy) -> list[np.ndarray]:
-    return uv_island_triangle_groups(triangles) if group_by == "uv-island" else [np.arange(len(triangles), dtype=np.int64)]
+def _groups(triangles: np.ndarray, group_by: GroupBy, uvs: np.ndarray) -> list[np.ndarray]:
+    return uv_island_triangle_groups(triangles, uvs) if group_by == "uv-island" else [np.arange(len(triangles), dtype=np.int64)]
 
 
 def _element(loaded, primitive, binding, key, uvs, transformed, triangles, triangle_rows, region) -> AtlasElement:  # type: ignore[no-untyped-def]
@@ -228,6 +347,14 @@ def _element(loaded, primitive, binding, key, uvs, transformed, triangles, trian
         pixel_polygons=[[list(point) for point in polygon] for polygon in region.pixel_polygons],
         bounding_box=BoundingBox(x=region.bounding_box[0], y=region.bounding_box[1], width=region.bounding_box[2], height=region.bounding_box[3]),
         uv_islands=islands, node_transform=primitive.node_transform.reshape(-1).tolist(),
+        source_primitives=[
+            {
+                "node_index": ref.node_index,
+                "mesh_index": ref.mesh_index,
+                "primitive_index": ref.primitive_index,
+                "material_index": ref.material_index,
+            }
+        ],
     )
 
 

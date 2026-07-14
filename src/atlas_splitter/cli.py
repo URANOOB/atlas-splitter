@@ -1,5 +1,6 @@
 """Interfaz de línea de comandos de atlas-splitter."""
 
+import logging
 import sys
 from pathlib import Path
 from typing import Annotated, cast
@@ -15,12 +16,13 @@ from atlas_splitter.blender.script_writer import (
     write_object_rebuild_script,
     write_single_object_rebuild_script,
 )
-from atlas_splitter.config import apply_cli_overrides, load_config, write_default_config
+from atlas_splitter.config import apply_cli_overrides, load_config
 from atlas_splitter.diagnostics import collect_diagnostics, has_critical_failures
 from atlas_splitter.domain import slugify
 from atlas_splitter.exceptions import (
     AtlasSplitterError,
     GltfLoadError,
+    InputValidationError,
     PrimitiveDecodeError,
     SemanticInferenceError,
     SemanticModelUnavailableError,
@@ -28,7 +30,7 @@ from atlas_splitter.exceptions import (
 from atlas_splitter.geometry.glb_exporter import GroupBy, export_glb
 from atlas_splitter.geometry.glb_loader import load_gltf
 from atlas_splitter.geometry.object_grouping import ExportedAtlas, write_object_manifest
-from atlas_splitter.geometry.texture_association import associate_named_external_atlases
+from atlas_splitter.geometry.texture_association import load_atlas_bindings, resolve_external_atlases
 from atlas_splitter.installer import InstallationError, create_isolated_environment, install_runtime
 from atlas_splitter.io.image_loader import ImageLoadError, discover_images
 from atlas_splitter.io.zip_writer import write_zip
@@ -39,7 +41,7 @@ from atlas_splitter.pipeline import process_image
 from atlas_splitter.segmentation.sam2_engine import Sam2Engine
 from atlas_splitter.semantic.grouping_service import group_extracted_atlas
 from atlas_splitter.semantic.qwen3_vl_engine import Qwen3VLSemanticGroupingBackend
-from atlas_splitter.semantic3d import Semantic3DConfig, group_first_house
+from atlas_splitter.semantic3d import Semantic3DConfig, group_semantic_3d
 from atlas_splitter.semantic_models.manager import download_semantic_model, is_semantic_model_downloaded
 from atlas_splitter.semantic_models.registry import SEMANTIC_MODELS, get_semantic_model
 
@@ -49,6 +51,16 @@ semantic_models_app = typer.Typer(help="Gestiona modelos semánticos locales.", 
 app.add_typer(models_app, name="models")
 app.add_typer(semantic_models_app, name="semantic-models")
 console = Console()
+LOGGER = logging.getLogger(__name__)
+
+
+@app.callback()
+def common_options(
+    debug: Annotated[bool, typer.Option("--debug", help="Muestra traceback completo si ocurre un error.")] = False,
+) -> None:
+    """Opciones comunes; el traceback se reserva para depuracion explicita."""
+    if debug:
+        LOGGER.info("Modo de depuracion CLI activado.")
 
 
 def _planned(command: str) -> None:
@@ -57,30 +69,75 @@ def _planned(command: str) -> None:
 
 
 def interactive_arguments(cwd: Path) -> list[str]:
-    """Recoge sólo las decisiones necesarias y devuelve argumentos CLI reproducibles."""
-    has_glb = typer.confirm("¿Tienes un archivo GLB/glTF con geometría y UV?", default=False)
-    if has_glb:
-        model = Path(typer.prompt("Ruta del archivo GLB/glTF")).expanduser()
-        atlas_directory = Path(typer.prompt("Carpeta que contiene los atlas WEBP")).expanduser()
-        output = Path(typer.prompt("Carpeta para los resultados", default=str(cwd / "outputs"))).expanduser()
-        draco = cwd / "draco" / "gltf"
-        console.print(f"[yellow]Si el GLB usa Draco, se necesita el decodificador local en {draco}.[/yellow]")
-        typer.confirm("¿Deseas continuar con la comprobación local de Draco?", default=True, abort=True)
-        return [
-            "glb",
-            str(model),
-            "--atlas-dir",
-            str(atlas_directory),
-            "--output",
-            str(output),
-            "--allow-unbound-atlas",
-        ]
-    source = Path(typer.prompt("Ruta de un atlas WEBP o una carpeta de atlas")).expanduser()
-    output = Path(typer.prompt("Carpeta para los resultados", default=str(cwd / "outputs"))).expanduser()
+    """Guía local con rutas validadas y devuelve un comando reproducible."""
+    while True:
+        console.print("\n[bold]Atlas Splitter[/bold] — un atlas es una imagen con varias texturas.")
+        choice = typer.prompt(
+            "Elige: 1) atlas 2D, 2) atlas + GLB/UV, 3) doctor, 4) modelos locales",
+            default="1",
+        ).strip()
+        if choice == "3":
+            return ["doctor"]
+        if choice == "4":
+            return ["models", "list"]
+        if choice not in {"1", "2"}:
+            console.print("[yellow]Elige 1, 2, 3 o 4.[/yellow]")
+            continue
+        if choice == "2":
+            arguments = _interactive_glb_arguments(cwd)
+        else:
+            arguments = _interactive_atlas_arguments(cwd)
+        if arguments is None:
+            console.print("[yellow]Volviste al menú principal.[/yellow]")
+            continue
+        console.print("\n[bold]Resumen antes de ejecutar[/bold]")
+        console.print(f"[cyan]Comando reproducible:[/cyan] atlas-splitter {' '.join(arguments)}")
+        if typer.confirm("¿Ejecutar este comando?", default=True):
+            return arguments
+
+
+def _interactive_atlas_arguments(cwd: Path) -> list[str] | None:
+    source = _prompt_existing_path("Ruta de un atlas WEBP o carpeta (vacío = atrás)", file_or_directory=True)
+    if source is None:
+        return None
+    output = Path(typer.prompt("Carpeta de salida", default=str(cwd / "outputs"))).expanduser()
     padding = typer.prompt("Píxeles extra para recuperar bordes", default=4, type=int)
-    config = write_default_config(cwd / "atlas-splitter.yaml")
-    console.print(f"[cyan]Configuración editable:[/cyan] {config}")
-    return ["run", str(source), "--output", str(output), "--config", str(config), "--calibration-pixels", str(padding)]
+    return ["run", str(source), "--output", str(output), "--calibration-pixels", str(padding)]
+
+
+def _interactive_glb_arguments(cwd: Path) -> list[str] | None:
+    model = _prompt_existing_path("Ruta del archivo GLB/glTF (vacío = atrás)", suffixes={".glb", ".gltf"})
+    if model is None:
+        return None
+    atlas_directory = _prompt_existing_path("Carpeta de atlas (vacío = atrás)", directory=True)
+    if atlas_directory is None:
+        return None
+    output = Path(typer.prompt("Carpeta de salida", default=str(cwd / "outputs"))).expanduser()
+    console.print("[dim]UV indica qué zona del atlas usa cada cara del modelo; no se modifica el GLB.[/dim]")
+    console.print(f"[yellow]Si usa Draco, se comprobará el decodificador local en {cwd / 'draco' / 'gltf'}.[/yellow]")
+    console.print("Al terminar, abre output/blender/rebuild_scene.py en Blender y ejecútalo desde Scripting.")
+    return ["glb", str(model), "--atlas-dir", str(atlas_directory), "--output", str(output)]
+
+
+def _prompt_existing_path(
+    label: str,
+    *,
+    file_or_directory: bool = False,
+    directory: bool = False,
+    suffixes: set[str] | None = None,
+) -> Path | None:
+    """Pide una ruta local; una entrada vacía permite retroceder sin error."""
+    while True:
+        raw = typer.prompt(label, default="").strip()
+        if not raw:
+            return None
+        path = Path(raw).expanduser()
+        valid = (file_or_directory and (path.is_file() or path.is_dir())) or (directory and path.is_dir()) or (
+            suffixes is not None and path.is_file() and path.suffix.lower() in suffixes
+        )
+        if valid:
+            return path
+        console.print(f"[red]Ruta no válida: {path}. Revisa que exista y vuelve a intentarlo.[/red]")
 
 
 @app.command()
@@ -92,8 +149,14 @@ def doctor() -> None:
     table.add_column("Estado")
     table.add_column("Detalle")
     for check in checks:
-        table.add_row(check.name, "OK" if check.ok else "FALTA", check.detail)
+        style = "green" if check.ok else "yellow" if not check.critical else "red"
+        table.add_row(check.name, f"[{style}]{check.status}[/{style}]", check.detail)
     console.print(table)
+    ready = {check.name for check in checks if check.ok}
+    console.print("\n[bold]Tu equipo está listo para:[/bold]")
+    console.print(f"{'[OK]' if 'Geometría glTF' in ready else '[X]'} Extraer atlas con GLB y UV")
+    console.print(f"{'[OK]' if 'OpenCV' in ready else '[X]'} Separar atlas con procesamiento clásico")
+    console.print(f"{'[OK]' if 'Qwen3-VL local' in ready else '[X]'} Usar Qwen3-VL local")
     if has_critical_failures(checks):
         raise typer.Exit(code=1)
 
@@ -105,6 +168,7 @@ def glb(
     atlas_dir: Annotated[
         Path | None, typer.Option(help="Directorio de atlas WEBP asociados por nombre de nodo")
     ] = None,
+    bindings: Annotated[Path | None, typer.Option(help="YAML de bindings atlas/nodos confirmado manualmente")] = None,
     output: Annotated[Path, typer.Option(help="Directorio de resultados")] = Path("outputs"),
     texture_index: Annotated[int | None, typer.Option(help="Índice de textura a usar")] = None,
     texture_slot: Annotated[str, typer.Option(help="Mapa de material a extraer")] = "baseColor",
@@ -119,37 +183,47 @@ def glb(
 ) -> None:
     """Exporta regiones UV y materiales de un GLB/glTF enteramente local."""
     if group_by not in {"node", "mesh", "primitive", "uv-island"}:
-        raise typer.BadParameter("--group-by debe ser node, mesh, primitive o uv-island")
+        raise typer.BadParameter(str(InputValidationError("--group-by debe ser node, mesh, primitive o uv-island")))
     if texture_slot not in {"baseColor", "normal", "metallicRoughness", "occlusion", "emissive"}:
         raise typer.BadParameter("--texture-slot no es válido")
     if atlas is not None and not atlas.is_file():
-        raise typer.BadParameter("El atlas externo no existe", param_hint="--atlas")
-    if atlas is not None and atlas_dir is not None:
-        raise typer.BadParameter("Use --atlas o --atlas-dir, no ambos")
+        raise typer.BadParameter(str(InputValidationError("El atlas externo no existe")), param_hint="--atlas")
+    if sum(value is not None for value in (atlas, atlas_dir, bindings)) > 1:
+        raise typer.BadParameter(str(InputValidationError("Use solo uno de --atlas, --atlas-dir o --bindings")))
+    if bindings is not None and not bindings.is_file():
+        raise typer.BadParameter(str(InputValidationError("El YAML de bindings no existe")), param_hint="--bindings")
     try:
         loaded = load_gltf(model)
-        if atlas_dir is not None:
-            if not allow_unbound_atlas:
-                raise typer.BadParameter("--atlas-dir requiere --allow-unbound-atlas")
-            associations = associate_named_external_atlases(loaded, atlas_dir)
+        if atlas_dir is not None or bindings is not None:
+            associations = (
+                load_atlas_bindings(bindings, loaded)
+                if bindings is not None
+                else resolve_external_atlases(loaded, _required_atlas_directory(atlas_dir))
+            )
             exported_atlases = [
                 ExportedAtlas(
-                    atlas_path=atlas_path,
-                    output_directory=output / atlas_path.stem,
+                    atlas_path=association.atlas_path,
+                    output_directory=output / association.atlas_path.stem,
                     manifest=export_glb(
                         loaded,
-                        output / atlas_path.stem,
-                        atlas=atlas_path,
+                        output / association.atlas_path.stem,
+                        atlas=association.atlas_path,
                         texture_index=texture_index,
                         texture_slot=texture_slot,
                         group_by=cast(GroupBy, group_by),
-                        allow_unbound_atlas=True,
-                        node_indices=node_indices,
-                        flip_v=flip_v,
+                        allow_unbound_atlas=allow_unbound_atlas or association.manual_confirmation,
+                        node_indices=set(association.node_indices),
+                        flip_v=association.flip_v if bindings is not None else flip_v,
+                        uv_set=association.uv_set,
+                        force_external_atlas=association.manual_confirmation,
                     ),
-                    flip_v=flip_v,
+                    flip_v=association.flip_v if bindings is not None else flip_v,
+                    association_method=association.method,
+                    association_confidence=association.confidence,
+                    manual_confirmation=association.manual_confirmation,
+                    uv_set=association.uv_set,
                 )
-                for atlas_path, node_indices in associations.items()
+                for association in associations
             ]
             object_manifest = write_object_manifest(
                 output / "objects_manifest.json", loaded.source_path, exported_atlases
@@ -198,6 +272,13 @@ def glb(
     )
 
 
+def _required_atlas_directory(value: Path | None) -> Path:
+    """Estrecha el tipo tras validar el modo de asociacion del comando GLB."""
+    if value is None:
+        raise ValueError("Se requiere un directorio de atlas para la asociacion automatica.")
+    return value
+
+
 @app.command()
 def semantic(
     atlas: Annotated[Path, typer.Argument(help="Atlas local sin GLB")],
@@ -216,22 +297,34 @@ def semantic(
 
 @app.command("semantic-3d")
 def semantic_3d(
-    model: Annotated[Path, typer.Argument(help="Room.glb local")],
-    atlas: Annotated[Path, typer.Argument(help="Samples/day/first-house_day.webp local")],
+    model: Annotated[Path, typer.Argument(help="GLB/glTF local")],
+    atlas: Annotated[Path, typer.Argument(help="Atlas local confirmado por la persona usuaria")],
     output: Annotated[Path, typer.Option(help="Raíz de salida GLB")] = Path("outputs"),
-    device: Annotated[str, typer.Option(help="auto, cpu o cuda para Qwen3-VL local")] = "cuda",
+    device: Annotated[str, typer.Option(help="auto, cpu o cuda para Qwen3-VL local")] = "auto",
     minimum_confidence: Annotated[float, typer.Option(help="Confianza mínima para aceptar un grupo")] = 0.70,
+    node: Annotated[int | None, typer.Option(help="Índice del nodo glTF a analizar")] = None,
+    mesh_index: Annotated[int | None, typer.Option(help="Índice de malla para desambiguar")] = None,
+    texture_index: Annotated[int | None, typer.Option(help="Índice de textura glTF a analizar")] = None,
+    uv_set: Annotated[int, typer.Option(help="Conjunto UV (TEXCOORD_n) a usar")] = 0,
+    flip_v: Annotated[bool, typer.Option(help="Invierte V para el atlas externo")] = True,
+    proximity_factor: Annotated[float, typer.Option(help="Distancia relativa para propuestas 3D")] = 0.08,
 ) -> None:
-    """Agrupa sólo First_House_Baked sin unir sus componentes de malla."""
-    if model.name != "Room.glb" or atlas.name != "first-house_day.webp":
-        raise typer.BadParameter("Esta primera fase sólo admite Room.glb y first-house_day.webp.")
+    """Agrupa un nodo GLB con UV sin unir físicamente sus componentes de malla."""
     if not model.is_file() or not atlas.is_file():
         raise typer.BadParameter("El GLB o atlas solicitado no existe localmente.")
     if not is_semantic_model_downloaded("qwen3-vl-2b"):
         raise typer.BadParameter("qwen3-vl-2b no está disponible localmente; no se descargará durante run.")
     backend = Qwen3VLSemanticGroupingBackend("qwen3-vl-2b", device, minimum_confidence, minimum_confidence)
     try:
-        destination = group_first_house(model, atlas, output, backend, Semantic3DConfig(minimum_confidence))
+        destination = group_semantic_3d(
+            model,
+            atlas,
+            output,
+            backend,
+            Semantic3DConfig(minimum_confidence, proximity_factor, flip_v, texture_index, uv_set),
+            node_index=node,
+            mesh_index=mesh_index,
+        )
     except (GltfLoadError, PrimitiveDecodeError, SemanticInferenceError, OSError, ValueError) as error:
         raise typer.BadParameter(str(error)) from error
     finally:
@@ -391,20 +484,38 @@ def main() -> None:
             get_command(app).main(args=["--help"], prog_name="atlas-splitter")
             return
         arguments = interactive_arguments(Path.cwd())
-    get_command(app).main(args=translate_simple_args(arguments), prog_name="atlas-splitter")
+    debug = "--debug" in arguments
+    try:
+        get_command(app).main(args=translate_simple_args(arguments), prog_name="atlas-splitter", standalone_mode=False)
+    except typer.Exit as error:
+        raise SystemExit(error.exit_code) from error
+    except Exception as error:
+        if debug:
+            console.print_exception()
+        else:
+            console.print(f"[red]Error: {error}[/red]\nUsa --debug para ver el traceback.")
+        raise SystemExit(1) from error
 
 
 @app.command()
 def install(
     model: Annotated[str | None, typer.Option(help="Checkpoint SAM 2 opcional")] = None,
     environment: Annotated[Path, typer.Option(help="Ruta del virtualenv aislado")] = Path(".atlas-splitter-venv"),
+    profile: Annotated[str, typer.Option(help="basic, geometry, semantic o all")] = "basic",
+    yes: Annotated[bool, typer.Option("--yes", help="Confirma una descarga de modelo solicitada")] = False,
 ) -> None:
     """Crea un entorno aislado local; no modifica el Python global."""
     console.print("Creando entorno aislado de atlas-splitter...")
     try:
-        target = create_isolated_environment(Path.cwd(), environment)
+        target = create_isolated_environment(Path.cwd(), environment, profile)
         if model is not None:
-            checkpoint = install_runtime(model)
+            if not yes and not typer.confirm(
+                f"Esto descargará SAM 2 y el checkpoint '{model}' dentro del entorno aislado. ¿Continuar?",
+                default=False,
+            ):
+                raise InstallationError("Descarga de modelo cancelada por la persona usuaria.")
+            python = target / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
+            checkpoint = install_runtime(model, python)
             console.print(f"[green]Checkpoint disponible:[/green] {checkpoint}")
     except (InstallationError, OSError, ValueError) as error:
         raise typer.BadParameter(str(error), param_hint="--environment") from error

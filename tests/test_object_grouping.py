@@ -35,7 +35,36 @@ def test_groups_parts_by_node_and_preserves_atlas_reference(tmp_path: Path) -> N
         tmp_path / "room.glb",
         [ExportedAtlas(atlas, tmp_path / "first-house_day", manifest, flip_v=True)],
     )
+
+    assert result.objects[0].associations[0].method == "manual"
+    assert result.objects[0].associations[0].uv_set is None
     assert len(result.objects) == 1
     assert result.objects[0].node_name == "First_House_Baked"
     assert result.objects[0].flip_v is True
+    assert result.objects[0].atlas_paths == [str(atlas.resolve())]
     assert len(result.objects[0].parts) == 2
+
+
+def test_preserves_multiple_atlases_for_the_same_node(tmp_path: Path) -> None:
+    first_atlas = tmp_path / "first-house_day.webp"
+    second_atlas = tmp_path / "first-house_night.webp"
+    manifest = UvManifest(
+        source_file="room.glb",
+        capabilities=AtlasCapabilities.geometry_guided(),
+        atlas_width=8,
+        atlas_height=8,
+        elements=[_element(0, "First_House_Baked")],
+    )
+
+    result = write_object_manifest(
+        tmp_path / "objects_manifest.json",
+        tmp_path / "room.glb",
+        [
+            ExportedAtlas(first_atlas, tmp_path / "first-house_day", manifest, flip_v=False),
+            ExportedAtlas(second_atlas, tmp_path / "first-house_night", manifest, flip_v=False),
+        ],
+    )
+
+    assert result.objects[0].atlas_path is None
+    assert result.objects[0].atlas_paths == sorted([str(first_atlas.resolve()), str(second_atlas.resolve())])
+    assert len(result.objects[0].associations) == 2

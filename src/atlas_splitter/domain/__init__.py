@@ -10,6 +10,7 @@ from atlas_splitter.domain.element import (
 )
 from atlas_splitter.domain.manifests import (
     SCHEMA_VERSION,
+    AtlasAssociationRecord,
     ObjectGroup,
     ObjectManifest,
     ObjectTexturePart,
@@ -21,6 +22,7 @@ from atlas_splitter.domain.manifests import (
 __all__ = [
     "SCHEMA_VERSION",
     "AtlasCapabilities",
+    "AtlasAssociationRecord",
     "AtlasElement",
     "BoundingBox",
     "ObjectGroup",

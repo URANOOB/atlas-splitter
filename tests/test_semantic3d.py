@@ -6,11 +6,13 @@ import numpy as np
 from PIL import Image
 
 from atlas_splitter.blender.script_writer import write_semantic_objects_rebuild_script
+from atlas_splitter.geometry.types import DecodedPrimitive, PrimitiveReference
 from atlas_splitter.semantic.types import GroupingResult, SemanticGroup
 from atlas_splitter.semantic3d.service import (
     Semantic3DConfig,
     _external_atlas_uvs,
     _manifest,
+    _write_components_for_primitives,
     _write_json,
     _write_proposals,
 )
@@ -33,6 +35,27 @@ def test_external_atlas_uvs_flip_v_before_rasterization() -> None:
     uvs = np.asarray([[0.25, 0.0], [0.75, 1.0]])
     assert _external_atlas_uvs(uvs, True).tolist() == [[0.25, 1.0], [0.75, 0.0]]
     assert _external_atlas_uvs(uvs, False).tolist() == uvs.tolist()
+
+
+def test_multiple_primitives_keep_distinct_editable_component_ids(tmp_path) -> None:
+    positions = np.asarray([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
+    uvs = np.asarray([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+    primitives = [
+        DecodedPrimitive(
+            PrimitiveReference(0, 0, index, None), positions, np.asarray([[0, 1, 2]]), {1: uvs}, ("Room",), np.eye(4)
+        )
+        for index in (0, 1)
+    ]
+
+    components, _ = _write_components_for_primitives(
+        tmp_path, primitives, Image.new("RGBA", (8, 8), "white"), Semantic3DConfig(uv_set=1)
+    )
+
+    assert [item["component_id"] for item in components] == [
+        "primitive_000_component_001",
+        "primitive_001_component_001",
+    ]
+    assert all(item["geometry_evidence"] == "exact" for item in components)
 
 
 def test_proximity_edges_create_one_composite_object_proposal(tmp_path) -> None:

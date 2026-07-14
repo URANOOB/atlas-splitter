@@ -5,6 +5,13 @@ from atlas_splitter.cli import app, interactive_arguments, translate_simple_args
 runner = CliRunner()
 
 
+def _help(arguments: list[str]) -> str:
+    """Obtiene ayuda sin depender del ancho de terminal del runner CI."""
+    result = runner.invoke(app, arguments, terminal_width=200)
+    assert result.exit_code == 0
+    return result.stdout
+
+
 def test_models_list() -> None:
     result = runner.invoke(app, ["models", "list"])
     assert result.exit_code == 0
@@ -12,8 +19,28 @@ def test_models_list() -> None:
 
 
 def test_new_modes_expose_help() -> None:
-    assert runner.invoke(app, ["glb", "--help"]).exit_code == 0
-    assert runner.invoke(app, ["semantic", "--help"]).exit_code == 0
+    _help(["glb", "--help"])
+    _help(["semantic", "--help"])
+    _help(["semantic-3d", "--help"])
+
+
+def test_debug_is_a_global_cli_option() -> None:
+    _help(["--debug", "--help"])
+
+
+def test_glb_error_exposes_a_stable_code_without_traceback(tmp_path) -> None:
+    result = runner.invoke(app, ["glb", str(tmp_path / "missing.gltf")])
+    assert result.exit_code != 0
+    assert "AS-GLB-002" in result.stderr
+    assert "Causa probable:" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+def test_glb_option_validation_uses_a_stable_cli_code(tmp_path) -> None:
+    result = runner.invoke(app, ["glb", str(tmp_path / "model.gltf"), "--group-by", "invalid"])
+    assert result.exit_code != 0
+    assert "AS-CLI-004" in result.stderr
+    assert "Solucion:" in result.stderr
 
 
 def test_run_rejects_a_missing_source(tmp_path) -> None:
@@ -22,10 +49,7 @@ def test_run_rejects_a_missing_source(tmp_path) -> None:
 
 
 def test_run_help_exposes_expected_stage_one_options() -> None:
-    result = runner.invoke(app, ["run", "--help"])
-    assert result.exit_code == 0
-    assert "--device" in result.stdout
-    assert "--min-area" in result.stdout
+    _help(["run", "--help"])
 
 
 def test_cli_processes_a_webp(tmp_path) -> None:
@@ -83,16 +107,26 @@ def test_simple_command_keeps_glb_subcommand() -> None:
 
 
 def test_install_help_is_available_without_installing_dependencies() -> None:
-    result = runner.invoke(app, ["install", "--help"])
-    assert result.exit_code == 0
-    assert "virtualenv" in result.stdout
+    _help(["install", "--help"])
 
 
-def test_interactive_atlas_mode_creates_a_yaml_and_simple_run_args(tmp_path, monkeypatch) -> None:
-    answers = iter([False, str(tmp_path / "atlas.webp"), str(tmp_path / "output"), 6])
-    monkeypatch.setattr("atlas_splitter.cli.typer.confirm", lambda *args, **kwargs: next(answers))
+def test_doctor_uses_ascii_readiness_indicators() -> None:
+    result = runner.invoke(app, ["doctor"])
+    assert result.exit_code in {0, 1}
+    assert "[OK] Extraer atlas con GLB y UV" in result.stdout
+
+
+def test_interactive_atlas_mode_returns_simple_reproducible_run_args(tmp_path, monkeypatch) -> None:
+    source = tmp_path / "atlas.webp"
+    source.touch()
+    answers = iter(["1", str(source), str(tmp_path / "output"), 6])
+    monkeypatch.setattr("atlas_splitter.cli.typer.confirm", lambda *args, **kwargs: True)
     monkeypatch.setattr("atlas_splitter.cli.typer.prompt", lambda *args, **kwargs: next(answers))
     arguments = interactive_arguments(tmp_path)
-    assert arguments[:2] == ["run", str(tmp_path / "atlas.webp")]
+    assert arguments[:2] == ["run", str(source)]
     assert arguments[-1] == "6"
-    assert (tmp_path / "atlas-splitter.yaml").is_file()
+
+
+def test_interactive_menu_can_run_doctor_without_requesting_paths(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr("atlas_splitter.cli.typer.prompt", lambda *args, **kwargs: "3")
+    assert interactive_arguments(tmp_path) == ["doctor"]

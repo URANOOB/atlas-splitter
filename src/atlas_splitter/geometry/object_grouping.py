@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from atlas_splitter.domain import (
+    AtlasAssociationRecord,
     AtlasCapabilities,
     AtlasElement,
     ObjectGroup,
@@ -28,6 +29,10 @@ class ExportedAtlas:
     output_directory: Path
     manifest: UvManifest
     flip_v: bool
+    association_method: str = "manual"
+    association_confidence: float = 1.0
+    manual_confirmation: bool = False
+    uv_set: int | None = None
 
 
 def write_object_manifest(destination: Path, source_glb: Path, atlases: list[ExportedAtlas]) -> ObjectManifest:
@@ -41,7 +46,7 @@ def write_object_manifest(destination: Path, source_glb: Path, atlases: list[Exp
         first_atlas, first_element = entries[0]
         atlas_paths = {str(atlas.atlas_path.resolve()) for atlas, _ in entries}
         if len(atlas_paths) != 1:
-            raise ValueError(f"El nodo {node_index} usa más de un atlas externo; requiere una política explícita.")
+            LOGGER.warning("El nodo %s usa varios atlas; se conservan como asociaciones separadas.", node_index)
         node_name = first_element.node_path[-1] if first_element.node_path else f"node_{node_index}"
         object_id = f"object_{hashlib.sha256(f'{node_index}:{node_name}'.encode()).hexdigest()[:16]}"
         parts = [
@@ -52,21 +57,39 @@ def write_object_manifest(destination: Path, source_glb: Path, atlases: list[Exp
             )
             for atlas, element in entries
         ]
+        associations = [
+            AtlasAssociationRecord(
+                method=atlas.association_method,
+                confidence=atlas.association_confidence,
+                manual_confirmation=atlas.manual_confirmation,
+                atlas_path=str(atlas.atlas_path.resolve()),
+                node_index=element.node_index,
+                mesh_index=element.mesh_index,
+                material_index=element.material_index,
+                texture_index=element.texture_index,
+                image_index=element.image_index,
+                uv_set=atlas.uv_set if atlas.uv_set is not None else element.texcoord,
+                flip_v=atlas.flip_v,
+            )
+            for atlas, element in entries
+        ]
         objects.append(
             ObjectGroup(
                 object_id=object_id,
                 node_index=node_index,
                 node_name=node_name,
                 node_path=first_element.node_path,
-                atlas_path=next(iter(atlas_paths)),
+                atlas_path=next(iter(atlas_paths)) if len(atlas_paths) == 1 else None,
+                atlas_paths=sorted(atlas_paths),
                 flip_v=first_atlas.flip_v,
                 parts=parts,
+                associations=associations,
             )
         )
     manifest = ObjectManifest(
         source_file=str(source_glb.resolve()),
         capabilities=AtlasCapabilities.geometry_guided(),
-        warnings=["Los atlas externos se asociaron por nombre de nodo y se conservan como materiales editables."],
+        warnings=["Los atlas externos conservan el metodo, confianza y confirmacion de cada asociacion."],
         objects=objects,
     )
     write_versioned_manifest(destination, manifest)

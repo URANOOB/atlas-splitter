@@ -1,4 +1,8 @@
-# atlas-splitter
+# Atlas Splitter
+
+[![CI](https://github.com/URANOOB/atlas-splitter/actions/workflows/ci.yml/badge.svg)](https://github.com/URANOOB/atlas-splitter/actions/workflows/ci.yml) [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](pyproject.toml) [![Ruff](https://img.shields.io/badge/lint-Ruff-261230)](https://docs.astral.sh/ruff/) [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+> Convierte atlas de texturas en piezas editables mediante segmentación 2D o coordenadas UV exactas de GLB/glTF. Todo el procesamiento es local.
 
 CLI local y multiplataforma para convertir atlas de texturas en artefactos editables. Funciona en PowerShell, CMD, bash y terminales de macOS/Linux. Los archivos de entrada se procesan localmente.
 
@@ -10,7 +14,9 @@ Después de instalar, ejecuta simplemente:
 atlas-splitter
 ```
 
-El asistente pregunta si tienes un GLB/glTF o sólo atlas WEBP, pide las rutas de entrada y salida, y crea `atlas-splitter.yaml` editable para el modo sin geometría.
+Consulta las guías de [inicio rápido](docs/quick-start.md), [instalación en Windows](docs/windows-installation.md), [GLB y UV](docs/glb-and-uv-workflow.md) y [solución de problemas](docs/troubleshooting.md).
+
+El asistente ofrece atlas 2D, atlas+GLB/UV, `doctor` y modelos locales; valida rutas, permite volver al menú, muestra un resumen y devuelve el comando reproducible. El flujo básico no exige editar YAML.
 
 ## Dos modos
 
@@ -29,9 +35,15 @@ atlas-splitter semantic-3d GLB/Room.glb Samples/day/first-house_day.webp --outpu
 
 Agrupa primero por conectividad y proximidad 3D; Qwen3-VL local sólo etiqueta las propuestas resultantes. No hace Join de las mallas.
 
+### Resultado editable en Blender
+
+La reconstrucción semántica conserva los componentes como mallas editables bajo padres de grupo. En este ejemplo de First House, las piezas resultantes quedan separadas y organizadas en el Outliner, listas para inspección o edición individual:
+
+![First House separado en objetos editables dentro de Blender](docs/assets/semantic-first-house-separated.png)
+
 ## Configuración
 
-El asistente crea un YAML inicial. Ejemplo para ajustar bordes en atlas sin GLB:
+Puedes usar YAML opcional para ajustar bordes en atlas sin GLB:
 
 ```yaml
 device: cuda
@@ -41,14 +53,14 @@ segmentation:
   sam2_edge_padding: 4
 ```
 
-CUDA es el valor predeterminado cuando está disponible. Usa `--device cpu` si necesitas forzarlo.
+Usa `--device auto` para escoger CUDA cuando esté disponible o CPU de forma segura; `--device cpu` fuerza CPU.
 
 ## Comandos directos
 
 ```text
 atlas-splitter atlas.webp resultados
 atlas-splitter run ./atlases --recursive --output resultados --calibration-pixels 4
-atlas-splitter glb modelo.glb --atlas-dir ./atlases --allow-unbound-atlas --output resultados
+atlas-splitter glb modelo.glb --atlas-dir ./atlases --output resultados
 atlas-splitter doctor
 atlas-splitter models list
 atlas-splitter semantic-models list
@@ -60,6 +72,16 @@ La forma recomendada crea el entorno y dependencias sin tocar el Python global:
 
 ```text
 atlas-splitter install
+```
+
+También puedes crear un entorno del proyecto sin tocar Python global:
+
+```powershell
+.\scripts\install.ps1 -Features geometry
+```
+
+```bash
+./scripts/install.sh geometry
 ```
 
 También puede hacerse manualmente:
@@ -100,3 +122,17 @@ python -m pytest
 python -m ruff check .
 python -m mypy
 ```
+
+## Documentación
+
+- [Inicio rápido](docs/quick-start.md)
+- [GLB, UV y bindings](docs/glb-and-uv-workflow.md)
+- [Salida generada](docs/output-structure.md)
+- [Flujo Blender](docs/blender-workflow.md)
+- [Agrupación semántica](docs/semantic-grouping.md)
+- [Instalación Linux y macOS](docs/linux-macos-installation.md)
+- [Solución de problemas](docs/troubleshooting.md)
+
+## Privacidad y límites
+
+Las imágenes, GLB, manifiestos y modelos permanecen en el equipo. La calidad 2D depende de la segmentación visual; con GLB/UV se preserva la geometría declarada, pero un atlas externo ambiguo requiere confirmación. Las etiquetas semánticas son inferencias y se marcan como tales en sus manifiestos.

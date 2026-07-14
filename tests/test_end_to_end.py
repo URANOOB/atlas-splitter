@@ -5,6 +5,9 @@ from PIL import Image, ImageDraw
 from atlas_splitter.config import AppConfig
 from atlas_splitter.io.zip_writer import write_zip
 from atlas_splitter.pipeline import process_image
+from atlas_splitter.semantic.fake_backend import FakeSemanticGroupingBackend
+from atlas_splitter.semantic.grouping_service import group_extracted_atlas
+from atlas_splitter.semantic.types import GroupingResult, SemanticGroup
 
 
 def test_lossy_webp_end_to_end_creates_all_artifacts(tmp_path) -> None:
@@ -23,3 +26,58 @@ def test_lossy_webp_end_to_end_creates_all_artifacts(tmp_path) -> None:
     assert (result / "contact_sheet.png").is_file()
     assert (result / "psd" / "element_001.psd").is_file()
     assert archive.is_file()
+
+
+def test_extracted_atlas_groups_with_a_deterministic_fake_backend(tmp_path) -> None:
+    source = tmp_path / "atlas.webp"
+    image = Image.new("RGBA", (48, 24), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((2, 2, 18, 20), fill=(255, 0, 0, 255))
+    draw.rectangle((29, 2, 45, 20), fill=(0, 255, 0, 255))
+    image.save(source, "WEBP", lossless=True)
+    config = AppConfig.model_validate(
+        {"segmentation": {"min_area": 20}, "grouping": {"enabled": True, "device": "cpu"}}
+    )
+    destination = process_image(source, tmp_path / "results", config)
+    backend = FakeSemanticGroupingBackend(
+        GroupingResult(
+            [SemanticGroup("objects_001", "objects", "objects", ["E001", "E002"], 0.9, "accepted")],
+            [],
+            "fake",
+            "deterministic",
+            0.0,
+        )
+    )
+
+    result = group_extracted_atlas(destination, config.grouping, backend)
+
+    manifest = json.loads((destination / "semantic_manifest.json").read_text(encoding="utf-8"))
+    assert result.groups[0].group_id == "objects_001"
+    assert manifest["backend"] == "fake"
+    assert (destination / "objects" / "objects_001" / "element_001.png").is_file()
+    assert (destination / "grouped" / "objects_001.psd").is_file()
+    assert not (destination / "semantic_inputs").exists()
+
+
+def test_semantic_manifest_is_reproducible_with_the_same_fake_result(tmp_path) -> None:
+    source = tmp_path / "atlas.webp"
+    Image.new("RGBA", (20, 20), (255, 0, 0, 255)).save(source, "WEBP", lossless=True)
+    config = AppConfig.model_validate(
+        {"segmentation": {"min_area": 20}, "grouping": {"enabled": True, "device": "cpu"}}
+    )
+    expected = GroupingResult(
+        [SemanticGroup("object_001", "object", "object", ["E001"], 0.9, "accepted")],
+        [],
+        "fake",
+        "deterministic",
+        0.0,
+    )
+    first = process_image(source, tmp_path / "first", config)
+    second = process_image(source, tmp_path / "second", config)
+
+    group_extracted_atlas(first, config.grouping, FakeSemanticGroupingBackend(expected))
+    group_extracted_atlas(second, config.grouping, FakeSemanticGroupingBackend(expected))
+
+    assert json.loads((first / "semantic_manifest.json").read_text(encoding="utf-8")) == json.loads(
+        (second / "semantic_manifest.json").read_text(encoding="utf-8")
+    )

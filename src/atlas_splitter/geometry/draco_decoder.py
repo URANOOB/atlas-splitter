@@ -139,13 +139,13 @@ def _buffer_view_bytes(loaded: LoadedGltf, view_index: int) -> bytes:
 
 def _node_process_path(path: Path, node_executable: Path | None) -> str:
     """Convierte una ruta WSL para el Node de Windows, sin depender de ``wslpath``."""
-    resolved = path.resolve()
-    if node_executable is None or not str(node_executable).startswith("/mnt/"):
-        return str(resolved)
-    parts = resolved.parts
+    path_text = path.as_posix()
+    if node_executable is None or not node_executable.as_posix().startswith("/mnt/"):
+        return str(path.resolve())
+    parts = path_text.split("/")
     if len(parts) >= 4 and parts[1] == "mnt" and len(parts[2]) == 1:
         return f"{parts[2].upper()}:\\" + "\\".join(parts[3:])
-    return str(resolved)
+    return str(path.resolve())
 
 
 _NODE_PROGRAM = r'''const fs = require("fs");

@@ -9,6 +9,7 @@ from typing import Any, cast
 from PIL import Image
 
 from atlas_splitter.exceptions import SemanticInferenceError, SemanticModelUnavailableError
+from atlas_splitter.runtime import resolve_device
 from atlas_splitter.semantic.protocol import SemanticGroupingBackend
 from atlas_splitter.semantic.response_parser import SemanticResponseParseError, parse_response_json
 from atlas_splitter.semantic.types import GroupingContext, GroupingResult
@@ -53,25 +54,19 @@ class Qwen3VLSemanticGroupingBackend(SemanticGroupingBackend):
         except ImportError as error:
             raise SemanticModelUnavailableError('Instale el extra opcional: pip install -e ".[semantic]"') from error
         model_path = semantic_model_path(self.model_name)
-        selected = "cuda" if self.device == "auto" and torch.cuda.is_available() else self.device
-        if selected == "cuda" and not torch.cuda.is_available():
-            raise SemanticModelUnavailableError(
-                "Se solicitó CUDA para agrupación semántica, pero CUDA no está disponible."
-            )
+        selected = resolve_device(self.device)
         dtype = torch.float32
         if selected == "cuda":
             dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
         try:
-            self._processor = AutoProcessor.from_pretrained(  # type: ignore[no-untyped-call]
-                model_path, local_files_only=True
-            )
+            self._processor = AutoProcessor.from_pretrained(model_path, local_files_only=True)
             self._model = AutoModelForImageTextToText.from_pretrained(
                 model_path,
                 local_files_only=True,
                 torch_dtype=dtype,
             )
-            self._model.to(selected)  # type: ignore[arg-type]
-            self._model.eval()  # type: ignore[no-untyped-call]
+            self._model.to(selected)
+            self._model.eval()
         except OSError as error:
             raise SemanticModelUnavailableError(f"No se pudo cargar el modelo local {model_path}: {error}") from error
         self._torch = torch

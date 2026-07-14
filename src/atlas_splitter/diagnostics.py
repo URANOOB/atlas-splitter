@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import platform
+import shutil
 import sys
 import zipfile
 from collections.abc import Callable
@@ -20,6 +21,13 @@ class DiagnosticCheck:
     ok: bool
     detail: str
     critical: bool = False
+
+    @property
+    def status(self) -> str:
+        """Etiqueta apta para una interfaz de usuario no técnica."""
+        if self.ok:
+            return "LISTO"
+        return "REQUIERE ATENCIÓN" if self.critical else "OPCIONAL"
 
 
 def _module_version(module_name: str) -> str | None:
@@ -73,6 +81,17 @@ def _check_pillow_webp(module_version: Callable[[str], str | None]) -> Diagnosti
     )
 
 
+def _check_writable_directory(directory: Path) -> DiagnosticCheck:
+    """Comprueba escritura temporal sin dejar archivos residuales."""
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+        with TemporaryDirectory(dir=directory) as probe:
+            Path(probe, "write-probe.txt").write_text("ok", encoding="utf-8")
+        return DiagnosticCheck("Permisos de escritura", True, str(directory.resolve()))
+    except OSError as error:
+        return DiagnosticCheck("Permisos de escritura", False, str(error), critical=True)
+
+
 def collect_diagnostics(
     checkpoint_dir: Path | None = None,
     module_version: Callable[[str], str | None] = _module_version,
@@ -97,18 +116,46 @@ def collect_diagnostics(
         cuda_available = bool(torch.cuda.is_available())
         cuda_detail = "no disponible"
         if cuda_available:
-            device_name = torch.cuda.get_device_name(0)
-            free, total = torch.cuda.mem_get_info(0)
-            cuda_detail = f"{device_name}; {free // 2**20} MiB libres de {total // 2**20} MiB"
+            try:
+                device_name = torch.cuda.get_device_name(0)
+                free, total = torch.cuda.mem_get_info(0)
+                cuda_detail = f"{device_name}; {free // 2**20} MiB libres de {total // 2**20} MiB"
+            except (RuntimeError, AssertionError) as error:
+                cuda_available = False
+                cuda_detail = f"no disponible: {error}"
         checks.append(DiagnosticCheck("PyTorch", True, torch_version, critical=True))
         checks.append(DiagnosticCheck("CUDA", cuda_available, cuda_detail))
     checks.append(_check_pillow_webp(module_version))
-    for label, module in (("OpenCV", "cv2"),):
+    for label, module in (("Trimesh", "trimesh"), ("NetworkX", "networkx")):
+        version = module_version(module)
+        checks.append(DiagnosticCheck(label, version is not None, version or "no instalado"))
+    for label, module in (("OpenCV", "cv2"), ("Geometría glTF", "pygltflib")):
         version = module_version(module)
         checks.append(DiagnosticCheck(label, version is not None, version or "no instalado"))
     checkpoint_root = checkpoint_dir or Path.home() / ".cache" / "atlas-splitter" / "checkpoints"
     has_checkpoint = checkpoint_root.exists() and any(checkpoint_root.glob("*.pt"))
     checks.append(DiagnosticCheck("Checkpoint SAM 2", has_checkpoint, str(checkpoint_root)))
+    semantic_root = Path.home() / ".cache" / "atlas-splitter" / "semantic-models"
+    has_semantic_model = semantic_root.is_dir() and any(semantic_root.glob("*/config.json"))
+    checks.append(DiagnosticCheck("Qwen3-VL local", has_semantic_model, str(semantic_root)))
+    checks.append(DiagnosticCheck("Caché SAM 2", checkpoint_root.is_dir(), str(checkpoint_root)))
+    checks.append(DiagnosticCheck("Caché semántica", semantic_root.is_dir(), str(semantic_root)))
+    draco_root = Path.cwd() / "draco" / "gltf"
+    has_draco = draco_root.is_dir() and any(draco_root.iterdir())
+    checks.append(DiagnosticCheck("Decodificador Draco", has_draco, str(draco_root)))
+    checks.append(
+        DiagnosticCheck(
+            "Blender",
+            shutil.which("blender") is not None,
+            shutil.which("blender") or "no encontrado en PATH",
+        )
+    )
+    try:
+        free = shutil.disk_usage(Path.cwd()).free // 2**30
+        checks.append(DiagnosticCheck("Espacio libre", free >= 2, f"{free} GiB libres en la unidad de trabajo"))
+    except OSError as error:
+        checks.append(DiagnosticCheck("Espacio libre", False, str(error)))
+    checks.append(_check_writable_directory(Path.cwd()))
     checks.append(_check_psd())
     checks.append(_check_zip())
     return checks

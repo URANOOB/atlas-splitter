@@ -14,6 +14,7 @@ from atlas_splitter.exceptions import Sam2InferenceError
 from atlas_splitter.io.image_loader import LoadedImage
 from atlas_splitter.models.manager import checkpoint_path, is_downloaded
 from atlas_splitter.models.registry import get_model
+from atlas_splitter.runtime import resolve_device
 from atlas_splitter.segmentation.classical import MaskCandidate
 
 
@@ -56,16 +57,13 @@ class Sam2Engine:
     def _load_generator(self) -> object:
         if self._generator is not None:
             return self._generator
-        import torch
         from sam2.automatic_mask_generator import (  # type: ignore[import-not-found]
             SAM2AutomaticMaskGenerator,
         )
         from sam2.build_sam import build_sam2  # type: ignore[import-not-found]
 
         spec = get_model(self.model_name)
-        selected_device = "cuda" if self.device == "auto" and torch.cuda.is_available() else self.device
-        if selected_device == "cuda" and not torch.cuda.is_available():
-            selected_device = "cpu"
+        selected_device = resolve_device(self.device)
         model = build_sam2(spec.config_name, str(checkpoint_path(self.model_name)), device=selected_device)
         self._runtime_device = selected_device
         self._generator = SAM2AutomaticMaskGenerator(
