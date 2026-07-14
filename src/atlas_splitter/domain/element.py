@@ -93,6 +93,7 @@ class AtlasElement(BaseModel):
     exported_files: dict[str, str] = Field(default_factory=dict)
     node_transform: list[float] = Field(default_factory=list)
     shared_region_consumers: list[str] = Field(default_factory=list)
+    source_primitives: list[dict[str, int | None]] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     compatibility_level: str = Field(default="geometry_guided", max_length=64)
 
