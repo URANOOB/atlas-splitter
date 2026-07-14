@@ -1,5 +1,6 @@
 import json
 
+import pytest
 from PIL import Image
 
 from atlas_splitter.config import AppConfig
@@ -36,3 +37,27 @@ def test_discovery_ignores_non_webp_and_loader_rejects_corruption(tmp_path) -> N
         pass
     else:
         raise AssertionError("Se esperaba ImageLoadError")
+
+
+def test_pipeline_refuses_to_overwrite_an_existing_output(tmp_path) -> None:
+    source = tmp_path / "atlas.webp"
+    Image.new("RGBA", (12, 12), (255, 0, 0, 255)).save(source, "WEBP", lossless=True)
+    config = AppConfig.model_validate({"segmentation": {"min_area": 4}})
+    process_image(source, tmp_path / "results", config)
+
+    with pytest.raises(FileExistsError):
+        process_image(source, tmp_path / "results", config)
+
+
+def test_pipeline_removes_partial_output_after_a_write_failure(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source = tmp_path / "atlas.webp"
+    Image.new("RGBA", (12, 12), (255, 0, 0, 255)).save(source, "WEBP", lossless=True)
+    config = AppConfig.model_validate({"segmentation": {"min_area": 4}})
+    monkeypatch.setattr(
+        "atlas_splitter.pipeline.write_manifest", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("disk"))
+    )
+
+    with pytest.raises(OSError, match="disk"):
+        process_image(source, tmp_path / "results", config)
+
+    assert not (tmp_path / "results" / "atlas").exists()
