@@ -59,6 +59,7 @@ class AtlasAssociationRecord(BaseModel):
     image_index: int | None = Field(default=None, ge=0)
     uv_set: int | None = Field(default=None, ge=0)
     flip_v: bool = False
+    texture_slot: str = Field(default="baseColor", min_length=1, max_length=64)
 
 
 class ObjectGroup(BaseModel):

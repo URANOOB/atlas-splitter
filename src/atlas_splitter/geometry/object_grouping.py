@@ -33,6 +33,7 @@ class ExportedAtlas:
     association_confidence: float = 1.0
     manual_confirmation: bool = False
     uv_set: int | None = None
+    texture_slot: str = "baseColor"
 
 
 def write_object_manifest(destination: Path, source_glb: Path, atlases: list[ExportedAtlas]) -> ObjectManifest:
@@ -70,6 +71,7 @@ def write_object_manifest(destination: Path, source_glb: Path, atlases: list[Exp
                 image_index=element.image_index,
                 uv_set=atlas.uv_set if atlas.uv_set is not None else element.texcoord,
                 flip_v=atlas.flip_v,
+                texture_slot=atlas.texture_slot,
             )
             for atlas, element in entries
         ]

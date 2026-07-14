@@ -202,7 +202,7 @@ def glb(
             associations = (
                 load_atlas_bindings(bindings, loaded)
                 if bindings is not None
-                else resolve_external_atlases(loaded, _required_atlas_directory(atlas_dir))
+                else resolve_external_atlases(loaded, _required_atlas_directory(atlas_dir), texture_slot)
             )
             exported_atlases = [
                 ExportedAtlas(
@@ -213,7 +213,7 @@ def glb(
                         output / association.atlas_path.stem,
                         atlas=association.atlas_path,
                         texture_index=texture_index,
-                        texture_slot=texture_slot,
+                        texture_slot=association.texture_slot,
                         group_by=cast(GroupBy, group_by),
                         allow_unbound_atlas=allow_unbound_atlas or association.manual_confirmation,
                         node_indices=set(association.node_indices),
@@ -227,6 +227,7 @@ def glb(
                     association_confidence=association.confidence,
                     manual_confirmation=association.manual_confirmation,
                     uv_set=association.uv_set,
+                    texture_slot=association.texture_slot,
                 )
                 for association in associations
             ]
