@@ -1,5 +1,6 @@
 """Interfaz de línea de comandos de atlas-splitter."""
 
+import json
 import logging
 import sys
 from pathlib import Path
@@ -143,9 +144,19 @@ def _prompt_existing_path(
 
 
 @app.command()
-def doctor() -> None:
+def doctor(format: Annotated[str, typer.Option("--format", help="text o json")] = "text") -> None:
     """Comprueba los requisitos locales sin descargar ni modificar nada."""
     checks = collect_diagnostics()
+    if format == "json":
+        payload = [{"name": item.name, "ok": item.ok, "status": item.status, "detail": item.detail} for item in checks]
+        console.print_json(
+            json.dumps(payload)
+        )
+        if has_critical_failures(checks):
+            raise typer.Exit(code=1)
+        return
+    if format != "text":
+        raise typer.BadParameter("--format debe ser text o json")
     table = Table(title="atlas-split doctor")
     table.add_column("Comprobación")
     table.add_column("Estado")

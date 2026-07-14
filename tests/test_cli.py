@@ -19,6 +19,13 @@ def test_models_list() -> None:
     assert "sam2-small" in result.stdout
 
 
+def test_doctor_supports_json_output() -> None:
+    result = runner.invoke(app, ["doctor", "--format", "json"])
+
+    assert result.exit_code in {0, 1}
+    assert '"name": "Python"' in result.stdout
+
+
 def test_new_modes_expose_help() -> None:
     _help(["glb", "--help"])
     _help(["semantic", "--help"])
