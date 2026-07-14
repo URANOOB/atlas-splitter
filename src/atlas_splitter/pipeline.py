@@ -94,6 +94,7 @@ def process_image(path: Path, output_root: Path, config: AppConfig, sam_engine: 
             discarded + duplicate_count,
             elements,
             perf_counter() - started,
+            getattr(sam_engine, "runtime_device", "cpu"),
         )
     except (Exception, KeyboardInterrupt):
         for item in sorted(destination.rglob("*"), reverse=True):

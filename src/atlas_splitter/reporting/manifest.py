@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from atlas_splitter.config import AppConfig
+from atlas_splitter.domain.manifests import SCHEMA_VERSION
 from atlas_splitter.io.image_loader import LoadedImage
 from atlas_splitter.segmentation.classical import MaskCandidate
 
@@ -19,14 +20,21 @@ def write_manifest(
     discarded: int,
     elements: list[MaskCandidate],
     elapsed_seconds: float,
+    runtime_device: str = "cpu",
 ) -> None:
     """Escribe metadatos reproducibles y asociaciones de cada elemento."""
     data = {
+        "schema_version": SCHEMA_VERSION,
+        "capabilities": {
+            "uv_available": False,
+            "geometry_available": False,
+            "reconstruction_quality": "approximate_2d_only",
+        },
         "source_file": str(image.path.resolve()),
         "sha256": image.sha256,
         "dimensions": {"width": image.width, "height": image.height, "channels": 4},
         "processed_at": datetime.now(UTC).isoformat(),
-        "device": "cpu",
+        "device": runtime_device,
         "model": config.model,
         "parameters": config.model_dump(mode="json"),
         "elapsed_seconds": round(elapsed_seconds, 6),

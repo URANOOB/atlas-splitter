@@ -1,120 +1,101 @@
 # atlas-splitter
 
-Convierte un atlas WEBP plano en elementos reutilizables: PNG, máscara, PSD,
-manifiesto, hoja de contacto y ZIP. Todo se procesa localmente.
+CLI local y multiplataforma para convertir atlas de texturas en artefactos editables. Funciona en PowerShell, CMD, bash y terminales de macOS/Linux. Los archivos de entrada se procesan localmente.
 
-## Ejemplo visual
+## Inicio sencillo
 
-| Atlas original | Elemento extraído |
-| --- | --- |
-| ![Atlas original](docs/examples/atlas-original.png) | ![Elemento separado con transparencia](docs/examples/atlas-extraido.png) |
+Después de instalar, ejecuta simplemente:
 
-El programa identifica una región, conserva sus píxeles visibles y la exporta
-como PNG, máscara y PSD. Si un borde necesita corrección, se ajusta con
-`--calibration-pixels`.
-
-## Para qué sirve
-
-Cuando solo existe un atlas final y se perdió el PSD original, `atlas-splitter`
-lo **despedaza en capas nuevas** para facilitar su reutilización. No recupera las
-capas artísticas originales: infiere regiones desde los píxeles visibles. Revisa
-siempre la hoja de contacto antes de reutilizar los resultados.
-
-## Instalación fácil
-
-En Windows se recomienda WSL 2 con Ubuntu y Python 3.11 o superior.
-
-```bash
-# Instala el proyecto una vez
-pip install -e .
-
-# Instala PyTorch CUDA, SAM 2 y el checkpoint pequeño
-atlas-splitter install
+```text
+atlas-splitter
 ```
 
-El comando `install` necesita Git y conexión a Internet solo la primera vez.
-Descarga todo en el equipo; los atlas nunca se suben a ningún servicio.
+El asistente pregunta si tienes un GLB/glTF o sólo atlas WEBP, pide las rutas de entrada y salida, y crea `atlas-splitter.yaml` editable para el modo sin geometría.
 
-Después, comprueba el entorno:
+## Dos modos
 
-```bash
-atlas-splitter doctor
+| Dispones de | Qué elige el asistente | Resultado |
+| --- | --- | --- |
+| Sólo atlas WEBP | Segmentación 2D | PNG, máscaras, PSD, manifiesto, contact sheet y ZIP. Ajusta `processing.padding` o `--calibration-pixels` para recuperar bordes. |
+| GLB/glTF y atlas | Extracción guiada por UV | Máscaras UV exactas, recortes de material, manifiestos y scripts Blender con geometría editable. |
+
+El modo GLB avisa si detecta `KHR_draco_mesh_compression`. Draco puede ser necesario para recuperar POSITION y UV; el proyecto usa únicamente el decodificador local de `draco/gltf` y nunca lo descarga durante una ejecución.
+
+Para First House existe además la prueba semántica 3D:
+
+```text
+atlas-splitter semantic-3d GLB/Room.glb Samples/day/first-house_day.webp --output outputs
 ```
 
-## Uso más simple
+Agrupa primero por conectividad y proximidad 3D; Qwen3-VL local sólo etiqueta las propuestas resultantes. No hace Join de las mallas.
 
-```bash
-# Guarda automáticamente en outputs/
-atlas-splitter atlas.webp
+## Configuración
 
-# Elige una carpeta de salida
-atlas-splitter atlas.webp mis-resultados
-```
-
-También se aceptan los comandos avanzados:
-
-```bash
-atlas-splitter run ./input --recursive --output outputs --zip resultados.zip
-atlas-splitter doctor
-atlas-splitter models list
-atlas-splitter models download sam2-small
-atlas-splitter inspect resultados.zip
-```
-
-## Calibrar bordes
-
-Si SAM 2 recorta demasiado un elemento, añade píxeles al borde:
-
-```bash
-atlas-splitter atlas.webp outputs --calibration-pixels 4
-```
-
-Para usar parámetros avanzados, conserva el subcomando `run`:
-
-```bash
-atlas-splitter run atlas.webp --output outputs --calibration-pixels 4 --crop-elements
-```
-
-| Píxeles | Uso |
-| --- | --- |
-| `0` | No expande la máscara. |
-| `2` | Corrección ligera. |
-| `4` | Valor predeterminado. |
-| `5-8` | Úsalo solo si aún falta borde; revisa que no incluya fondo. |
-
-La configuración YAML equivalente es:
+El asistente crea un YAML inicial. Ejemplo para ajustar bordes en atlas sin GLB:
 
 ```yaml
+device: cuda
+processing:
+  padding: 4
 segmentation:
   sam2_edge_padding: 4
 ```
 
-## Archivos generados
+CUDA es el valor predeterminado cuando está disponible. Usa `--device cpu` si necesitas forzarlo.
+
+## Comandos directos
 
 ```text
-outputs/
-  nombre_del_atlas/
-    png/element_001.png
-    masks/element_001.png
-    psd/element_001.psd
-    contact_sheet.png
-    manifest.json
+atlas-splitter atlas.webp resultados
+atlas-splitter run ./atlases --recursive --output resultados --calibration-pixels 4
+atlas-splitter glb modelo.glb --atlas-dir ./atlases --allow-unbound-atlas --output resultados
+atlas-splitter doctor
+atlas-splitter models list
+atlas-splitter semantic-models list
 ```
 
-Cada PSD incluye `Element`, `Original crop`, `Mask` y `Background reference`
-(oculta). Son capas nuevas de píxeles, no el PSD artístico original.
+## Instalación aislada
 
-## Limitaciones
+La forma recomendada crea el entorno y dependencias sin tocar el Python global:
 
-- Un objeto puede dividirse en varias regiones.
-- SAM 2 puede crear máscaras imperfectas o duplicadas.
-- Los resultados dependen de transparencia, contraste y composición del atlas.
-- Revisa `contact_sheet.png` y `manifest.json` antes de usar resultados en
-  producción.
+```text
+atlas-splitter install
+```
 
-## Desarrollo
+También puede hacerse manualmente:
+
+```text
+python -m venv .atlas-splitter-venv
+```
+
+Actívalo y luego instala los extras necesarios desde el directorio del repositorio:
+
+```powershell
+.\.atlas-splitter-venv\Scripts\Activate.ps1
+pip install -e ".[vision,semantic,geometry]"
+```
 
 ```bash
+source .atlas-splitter-venv/bin/activate
+pip install -e ".[vision,semantic,geometry]"
+```
+
+En macOS/Linux y Windows se usa el mismo ejecutable: `atlas-splitter`. Añade `atlas-splitter install --model sam2-small` sólo si deseas preparar también el runtime SAM 2 y su checkpoint.
+
+## Herramientas empleadas
+
+- Python 3.11+ y Typer/Rich para la CLI.
+- NumPy, OpenCV y Pillow para máscaras, recortes y contact sheets.
+- PSD Tools para PSD editables.
+- PyTorch, SAM 2 y CUDA opcional para segmentación.
+- Transformers, Accelerate y Qwen3-VL local para etiquetas semánticas.
+- pygltflib y el decodificador Draco local para GLB/glTF, UV y mallas.
+- Blender (`bpy`, sólo dentro del script generado) para reconstrucción editable.
+- Pydantic y YAML para configuración y manifiestos versionados.
+
+## Verificación
+
+```text
 python -m pytest
 python -m ruff check .
 python -m mypy

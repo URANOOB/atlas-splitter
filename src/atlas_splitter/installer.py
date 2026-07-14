@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 import sys
+import venv
 from pathlib import Path
 
 from atlas_splitter.models.manager import download_model
@@ -13,6 +14,24 @@ from atlas_splitter.models.manager import download_model
 
 class InstallationError(RuntimeError):
     """No se pudo preparar el runtime local de atlas-splitter."""
+
+
+def create_isolated_environment(project_root: Path, environment: Path | None = None) -> Path:
+    """Instala atlas-splitter y sus extras en un virtualenv local multiplataforma."""
+    target = environment or project_root / ".atlas-splitter-venv"
+    try:
+        if not target.exists():
+            venv.EnvBuilder(with_pip=True).create(target)
+        python = target / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+        if not python.is_file():
+            raise InstallationError(f"El entorno aislado no contiene Python: {python}")
+        subprocess.run([str(python), "-m", "pip", "install", "--upgrade", "pip"], check=True)
+        subprocess.run(
+            [str(python), "-m", "pip", "install", ".[vision,semantic,geometry]"], cwd=project_root, check=True
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise InstallationError(f"No se pudo crear el entorno aislado: {error}") from error
+    return target
 
 
 def install_runtime(model: str) -> Path:

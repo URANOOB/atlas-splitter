@@ -9,6 +9,13 @@ from atlas_splitter.models.manager import is_downloaded
 from atlas_splitter.segmentation.sam2_engine import Sam2Engine
 
 
+def test_sam2_engine_can_close_without_loading_a_model() -> None:
+    engine = Sam2Engine("sam2-small")
+    assert engine.runtime_device == "cpu"
+    engine.close()
+    assert engine.runtime_device == "cpu"
+
+
 @pytest.mark.gpu
 def test_sam2_checkpoint_is_usable_on_cuda() -> None:
     """Valida prerrequisitos reales sin descargar nada ni ejecutar una inferencia pesada."""
