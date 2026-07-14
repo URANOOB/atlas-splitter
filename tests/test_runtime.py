@@ -31,3 +31,15 @@ def test_resolve_device_cuda_fails_clearly_without_cuda(monkeypatch: pytest.Monk
     monkeypatch.setitem(sys.modules, "torch", _torch(False))
     with pytest.raises(DeviceResolutionError, match="CUDA no está disponible"):
         resolve_device("cuda")
+
+
+def test_structured_device_error_has_stable_code_cause_and_solution(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(sys.modules, "torch", _torch(False))
+
+    with pytest.raises(DeviceResolutionError) as raised:
+        resolve_device("cuda")
+
+    message = str(raised.value)
+    assert "AS-MODEL-003" in message
+    assert "Causa probable:" in message
+    assert "Solucion:" in message
