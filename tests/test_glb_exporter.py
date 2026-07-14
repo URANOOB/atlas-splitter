@@ -10,6 +10,7 @@ from PIL import Image
 
 from atlas_splitter.geometry.glb_exporter import _flip_v, export_glb
 from atlas_splitter.geometry.glb_loader import load_gltf
+from atlas_splitter.geometry.texture_association import load_atlas_bindings
 
 
 def test_exports_material_crops_masks_manifests_and_blender_script(tmp_path: Path) -> None:
@@ -91,6 +92,27 @@ def test_exports_uvs_with_an_explicit_manual_atlas_when_glb_has_no_material(tmp_
     assert manifest.elements[0].compatibility_level == "manual_external_atlas"
     assert manifest.elements[0].image_index is None
     assert "asociado manualmente" in manifest.elements[0].warnings[0]
+
+    bindings = tmp_path / "bindings.yaml"
+    bindings.write_text(
+        "atlas_bindings:\n  - atlas: atlas.png\n    nodes: [0]\n    uv_set: 0\n    flip_v: true\n",
+        encoding="utf-8",
+    )
+    loaded = load_gltf(model)
+    association = load_atlas_bindings(bindings, loaded)[0]
+    bound = export_glb(
+        loaded,
+        tmp_path / "bound-output",
+        atlas=association.atlas_path,
+        node_indices=set(association.node_indices),
+        uv_set=association.uv_set,
+        flip_v=association.flip_v,
+        force_external_atlas=association.manual_confirmation,
+    )
+    manifest_data = json.loads((tmp_path / "bound-output" / "uv_manifest.json").read_text(encoding="utf-8"))
+    assert bound.elements[0].texcoord == 0
+    assert manifest_data["elements"][0]["exported_files"]["uv_mask"].startswith("masks/")
+    assert (tmp_path / "bound-output" / "blender" / "rebuild_scene.py").is_file()
 
 
 def test_flips_only_the_v_coordinate_for_confirmed_external_atlas() -> None:
