@@ -26,6 +26,31 @@ def test_doctor_supports_json_output() -> None:
     assert '"name": "Python"' in result.stdout
 
 
+def test_preview_regenerates_a_local_report(tmp_path) -> None:
+    import json
+
+    from PIL import Image
+
+    Image.new("RGBA", (2, 2), "white").save(tmp_path / "atlas.png")
+    png = tmp_path / "png"
+    png.mkdir()
+    Image.new("RGBA", (2, 2), "red").save(png / "element_001.png")
+    (tmp_path / "manifest.json").write_text(
+        json.dumps(
+            {
+                "source_file": str(tmp_path / "atlas.png"),
+                "elements": [{"name": "element_001", "png": "png/element_001.png"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["preview", str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert (tmp_path / "report" / "index.html").is_file()
+
+
 def test_new_modes_expose_help() -> None:
     _help(["glb", "--help"])
     _help(["semantic", "--help"])

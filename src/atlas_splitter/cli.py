@@ -41,6 +41,7 @@ from atlas_splitter.models.manager import download_model as fetch_model
 from atlas_splitter.models.manager import is_downloaded
 from atlas_splitter.models.registry import MODELS, get_model
 from atlas_splitter.pipeline import process_image
+from atlas_splitter.reporting.html_report import generate_html_report
 from atlas_splitter.segmentation.sam2_engine import Sam2Engine
 from atlas_splitter.semantic.grouping_service import group_extracted_atlas
 from atlas_splitter.semantic.qwen3_vl_engine import Qwen3VLSemanticGroupingBackend
@@ -298,6 +299,16 @@ def _required_atlas_directory(value: Path | None) -> Path:
     if value is None:
         raise ValueError("Se requiere un directorio de atlas para la asociacion automatica.")
     return value
+
+
+@app.command()
+def preview(output: Annotated[Path, typer.Argument(help="Directorio de una ejecución existente")]) -> None:
+    """Regenera el reporte HTML local de una extracción visual ya terminada."""
+    try:
+        report = generate_html_report(output)
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        raise typer.BadParameter(str(error), param_hint="output") from error
+    console.print(f"[green]Reporte local:[/green] {report}")
 
 
 @app.command()
