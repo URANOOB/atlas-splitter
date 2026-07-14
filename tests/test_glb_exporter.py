@@ -161,11 +161,16 @@ def test_group_by_modes_produce_distinct_deterministic_element_counts(tmp_path: 
         encoding="utf-8",
     )
     loaded = load_gltf(model)
-    counts = {
-        mode: len(export_glb(loaded, tmp_path / mode, group_by=mode).elements)
+    manifests = {
+        mode: export_glb(loaded, tmp_path / mode, group_by=mode)
         for mode in ("node", "mesh", "primitive", "uv-island")
     }
+    counts = {mode: len(manifest.elements) for mode, manifest in manifests.items()}
     assert counts == {"node": 2, "mesh": 1, "primitive": 4, "uv-island": 8}
+    assert all(element.group_by == mode for mode, manifest in manifests.items() for element in manifest.elements)
+    mesh_sources = manifests["mesh"].elements[0].source_primitives
+    assert len(mesh_sources) == 4
+    assert all("node_transform" in source for source in mesh_sources)
 
 
 def test_node_group_keeps_regions_and_auxiliary_maps_per_material(tmp_path: Path) -> None:

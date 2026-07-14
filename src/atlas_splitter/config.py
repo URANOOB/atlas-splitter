@@ -70,6 +70,7 @@ class GltfConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     group_by: Literal["node", "mesh", "primitive", "uv-island"] = "uv-island"
+    uv_tolerance: float = Field(default=1e-6, gt=0.0)
     texture_slot: Literal["baseColor", "normal", "metallicRoughness", "occlusion", "emissive"] = "baseColor"
     crop_padding: int = Field(default=2, ge=0)
     export_blender_script: bool = True

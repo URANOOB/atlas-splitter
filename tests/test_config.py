@@ -10,6 +10,7 @@ def test_default_config_has_expected_values() -> None:
     assert config.grouping.device == "cuda"
     assert config.segmentation.min_area == 400
     assert config.gltf.group_by == "uv-island"
+    assert config.gltf.uv_tolerance == 1e-6
     assert config.semantic.enabled is False
 
 

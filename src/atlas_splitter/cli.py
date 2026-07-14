@@ -173,6 +173,7 @@ def glb(
     texture_index: Annotated[int | None, typer.Option(help="Índice de textura a usar")] = None,
     texture_slot: Annotated[str, typer.Option(help="Mapa de material a extraer")] = "baseColor",
     group_by: Annotated[str, typer.Option(help="node, mesh, primitive o uv-island")] = "uv-island",
+    uv_tolerance: Annotated[float, typer.Option(help="Tolerancia para comparar extremos de aristas UV")] = 1e-6,
     allow_unbound_atlas: Annotated[
         bool,
         typer.Option("--allow-unbound-atlas", help="Confirma una asociación manual para GLB sin materiales"),
@@ -184,6 +185,8 @@ def glb(
     """Exporta regiones UV y materiales de un GLB/glTF enteramente local."""
     if group_by not in {"node", "mesh", "primitive", "uv-island"}:
         raise typer.BadParameter(str(InputValidationError("--group-by debe ser node, mesh, primitive o uv-island")))
+    if uv_tolerance <= 0:
+        raise typer.BadParameter(str(InputValidationError("--uv-tolerance debe ser mayor que cero")))
     if texture_slot not in {"baseColor", "normal", "metallicRoughness", "occlusion", "emissive"}:
         raise typer.BadParameter("--texture-slot no es válido")
     if atlas is not None and not atlas.is_file():
@@ -216,6 +219,7 @@ def glb(
                         flip_v=association.flip_v if bindings is not None else flip_v,
                         uv_set=association.uv_set,
                         force_external_atlas=association.manual_confirmation,
+                        uv_tolerance=uv_tolerance,
                     ),
                     flip_v=association.flip_v if bindings is not None else flip_v,
                     association_method=association.method,
@@ -260,6 +264,7 @@ def glb(
                 group_by=cast(GroupBy, group_by),
                 allow_unbound_atlas=allow_unbound_atlas,
                 flip_v=flip_v,
+                uv_tolerance=uv_tolerance,
             )
             element_count = len(manifest.elements)
     except (GltfLoadError, PrimitiveDecodeError, OSError, ValueError) as error:

@@ -49,3 +49,20 @@ def test_uv_island_coordinates_support_repeat_ranges() -> None:
     triangles = np.array([[0, 1, 2], [3, 4, 5]])
     uvs = np.array([[1, 0], [2, 0], [1, 1], [2, 0], [1, 0], [2, 1]], dtype=float)
     assert [group.tolist() for group in uv_island_triangle_groups(triangles, uvs)] == [[0, 1]]
+
+
+def test_uv_edges_within_tolerance_connect_without_quantization_artifacts() -> None:
+    triangles = np.array([[0, 1, 2], [3, 4, 5]])
+    uvs = np.array(
+        [[0, 0], [1, 0], [0, 1], [1 + 0.75e-6, 0], [-0.75e-6, 0], [1, 1]], dtype=float
+    )
+
+    assert [group.tolist() for group in uv_island_triangle_groups(triangles, uvs, tolerance=1e-6)] == [[0, 1]]
+    assert [group.tolist() for group in uv_island_triangle_groups(triangles, uvs, tolerance=0.5e-6)] == [[0], [1]]
+
+
+def test_degenerate_uv_triangles_remain_isolated() -> None:
+    triangles = np.array([[0, 1, 2], [3, 4, 5]])
+    uvs = np.array([[0, 0], [1, 0], [2, 0], [0, 0], [1, 0], [2, 0]], dtype=float)
+
+    assert [group.tolist() for group in uv_island_triangle_groups(triangles, uvs)] == [[0], [1]]

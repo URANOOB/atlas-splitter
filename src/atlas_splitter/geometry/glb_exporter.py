@@ -55,6 +55,7 @@ def export_glb(
     flip_v: bool = False,
     uv_set: int | None = None,
     force_external_atlas: bool = False,
+    uv_tolerance: float = 1e-6,
 ) -> UvManifest:
     """Escribe máscaras UV, recortes, manifiestos y el script de reconstrucción."""
     primitives = decode_scene_primitives(loaded)
@@ -92,14 +93,16 @@ def export_glb(
         if binding.texcoord not in primitive.texcoords:
             raise PrimitiveDecodeError(f"La primitiva {primitive.reference} no contiene TEXCOORD_{binding.texcoord}.")
         uvs = primitive.texcoords[binding.texcoord]
-        groups = _groups(primitive.triangle_indices, group_by, uvs)
+        groups = _groups(primitive.triangle_indices, group_by, uvs, uv_tolerance)
         for group_index, triangle_rows in enumerate(groups):
             triangles = primitive.triangle_indices[triangle_rows]
             transformed = _flip_v(binding.transform.apply(uvs)) if flip_v else binding.transform.apply(uvs)
             source_image = override or read_texture_image(loaded, binding.image_index)
             region = rasterize_uv_triangles(transformed, triangles, source_image.width, source_image.height, binding.wrap_s, binding.wrap_t)
             key = f"{group_by}-{group_index}"
-            element = _element(loaded, primitive, binding, key, uvs, transformed, triangles, triangle_rows, region)
+            element = _element(
+                loaded, primitive, binding, key, uvs, transformed, triangles, triangle_rows, region, group_by
+            )
             element_dir = destination / "materials" / element.element_id
             material_index = primitive.reference.material_index
             exported = (
@@ -231,6 +234,7 @@ def _coalesce_elements(
                     "triangle_indices": triangles,
                     "bounding_box": BoundingBox(x=x, y=y, width=width, height=height),
                     "uv_islands": [island for item in members for island in item.uv_islands],
+                    "group_by": group_by,
                     "exported_files": files,
                     "source_primitives": source_primitives,
                     "warnings": [
@@ -244,12 +248,13 @@ def _coalesce_elements(
     return result
 
 
-def _primitive_record(element: AtlasElement) -> dict[str, int | None]:
+def _primitive_record(element: AtlasElement) -> dict[str, object]:
     return {
         "node_index": element.node_index,
         "mesh_index": element.mesh_index,
         "primitive_index": element.primitive_index,
         "material_index": element.material_index,
+        "node_transform": element.node_transform,
     }
 
 
@@ -324,11 +329,15 @@ def _flip_v(uvs: np.ndarray) -> np.ndarray:
     return flipped
 
 
-def _groups(triangles: np.ndarray, group_by: GroupBy, uvs: np.ndarray) -> list[np.ndarray]:
-    return uv_island_triangle_groups(triangles, uvs) if group_by == "uv-island" else [np.arange(len(triangles), dtype=np.int64)]
+def _groups(triangles: np.ndarray, group_by: GroupBy, uvs: np.ndarray, uv_tolerance: float) -> list[np.ndarray]:
+    return (
+        uv_island_triangle_groups(triangles, uvs, tolerance=uv_tolerance)
+        if group_by == "uv-island"
+        else [np.arange(len(triangles), dtype=np.int64)]
+    )
 
 
-def _element(loaded, primitive, binding, key, uvs, transformed, triangles, triangle_rows, region) -> AtlasElement:  # type: ignore[no-untyped-def]
+def _element(loaded, primitive, binding, key, uvs, transformed, triangles, triangle_rows, region, group_by) -> AtlasElement:  # type: ignore[no-untyped-def]
     from atlas_splitter.domain import slugify, stable_element_id
 
     ref = primitive.reference
@@ -346,13 +355,14 @@ def _element(loaded, primitive, binding, key, uvs, transformed, triangles, trian
         original_uvs=uvs.tolist(), transformed_uvs=transformed.tolist(), triangle_indices=triangles.tolist(),
         pixel_polygons=[[list(point) for point in polygon] for polygon in region.pixel_polygons],
         bounding_box=BoundingBox(x=region.bounding_box[0], y=region.bounding_box[1], width=region.bounding_box[2], height=region.bounding_box[3]),
-        uv_islands=islands, node_transform=primitive.node_transform.reshape(-1).tolist(),
+        uv_islands=islands, group_by=group_by, node_transform=primitive.node_transform.reshape(-1).tolist(),
         source_primitives=[
             {
                 "node_index": ref.node_index,
                 "mesh_index": ref.mesh_index,
                 "primitive_index": ref.primitive_index,
                 "material_index": ref.material_index,
+                "node_transform": primitive.node_transform.reshape(-1).tolist(),
             }
         ],
     )

@@ -43,6 +43,12 @@ def test_glb_option_validation_uses_a_stable_cli_code(tmp_path) -> None:
     assert "Solucion:" in result.stderr
 
 
+def test_glb_rejects_a_non_positive_uv_tolerance(tmp_path) -> None:
+    result = runner.invoke(app, ["glb", str(tmp_path / "model.gltf"), "--uv-tolerance", "0"])
+    assert result.exit_code != 0
+    assert "--uv-tolerance debe ser mayor que cero" in result.stderr
+
+
 def test_run_rejects_a_missing_source(tmp_path) -> None:
     result = runner.invoke(app, ["run", str(tmp_path / "atlas.webp")])
     assert result.exit_code != 0
