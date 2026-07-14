@@ -1,4 +1,5 @@
 import json
+import shutil
 
 import pytest
 from PIL import Image
@@ -20,6 +21,9 @@ def test_pipeline_writes_png_masks_and_manifest(tmp_path) -> None:
     assert manifest["schema_version"] == "1.0"
     assert manifest["capabilities"]["reconstruction_quality"] == "approximate_2d_only"
     assert manifest["final_elements"] == 2
+    assert manifest["source_file"] == "source/atlas.webp"
+    assert manifest["source_file_portable"] is True
+    assert (destination / "source" / "atlas.webp").is_file()
     assert (destination / "png" / "element_001.png").is_file()
     assert (destination / "masks" / "element_002.png").is_file()
     assert (destination / "psd" / "element_001.psd").is_file()
@@ -61,3 +65,18 @@ def test_pipeline_removes_partial_output_after_a_write_failure(tmp_path, monkeyp
         process_image(source, tmp_path / "results", config)
 
     assert not (tmp_path / "results" / "atlas").exists()
+
+
+def test_pipeline_project_remains_portable_after_being_moved(tmp_path) -> None:
+    source = tmp_path / "atlas.webp"
+    Image.new("RGBA", (12, 12), (255, 0, 0, 255)).save(source, "WEBP", lossless=True)
+    config = AppConfig.model_validate({"segmentation": {"min_area": 4}})
+    destination = process_image(source, tmp_path / "results", config)
+    moved = tmp_path / "moved" / "project"
+    moved.parent.mkdir()
+    shutil.move(str(destination), moved)
+    source.unlink()
+
+    from atlas_splitter.reporting.html_report import generate_html_report
+
+    assert generate_html_report(moved).is_file()

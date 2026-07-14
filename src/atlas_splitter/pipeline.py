@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from time import perf_counter
 
@@ -23,6 +24,19 @@ from atlas_splitter.segmentation.sam2_engine import MaskGenerator
 
 def _safe_name(path: Path) -> str:
     return "".join(character if character.isalnum() or character in "-_" else "_" for character in path.stem)
+
+
+def _copy_source_image(source: Path, destination: Path) -> str:
+    """Copia el atlas a una ruta segura que viaja con el resultado."""
+    suffix = source.suffix.lower()
+    if not suffix or suffix == ".":
+        raise ValueError("El atlas fuente debe conservar una extensión válida.")
+    name = f"{_safe_name(source) or 'atlas'}{suffix}"
+    relative = Path("source") / name
+    target = destination / relative
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, target)
+    return relative.as_posix()
 
 
 def _ordered(candidates: list[MaskCandidate]) -> list[MaskCandidate]:
@@ -84,6 +98,7 @@ def process_image(path: Path, output_root: Path, config: AppConfig, sam_engine: 
     elements = _ordered(elements)
     destination.mkdir(parents=True)
     try:
+        source_file = _copy_source_image(path, destination)
         png_paths = _write_elements(destination, image, elements, config)
         if config.output.create_contact_sheet and png_paths:
             write_contact_sheet(destination / "contact_sheet.png", png_paths)
@@ -95,6 +110,7 @@ def process_image(path: Path, output_root: Path, config: AppConfig, sam_engine: 
             discarded + duplicate_count,
             elements,
             perf_counter() - started,
+            source_file,
             getattr(sam_engine, "runtime_device", "cpu"),
         )
         generate_html_report(destination)

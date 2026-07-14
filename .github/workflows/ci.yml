@@ -27,7 +27,12 @@ jobs:
       - name: Exercise public base CLI
         run: |
           .wheel-smoke/bin/atlas-splitter --help
-          .wheel-smoke/bin/atlas-splitter doctor --format json || test $? -eq 1
+          set +e
+          doctor_output="$(.wheel-smoke/bin/atlas-splitter doctor --format json 2>&1)"
+          doctor_code=$?
+          set -e
+          test "$doctor_code" -eq 0 -o "$doctor_code" -eq 1
+          echo "$doctor_output"
           .wheel-smoke/bin/atlas-splitter split --help
           .wheel-smoke/bin/atlas-splitter extract --help
           .wheel-smoke/bin/atlas-splitter semantic --help
@@ -39,8 +44,13 @@ jobs:
           test -d smoke-output/synthetic_atlas/masks
           test -d smoke-output/synthetic_atlas/psd
           test -f smoke-output/synthetic_atlas-atlas-splitter.zip
-          ! .wheel-smoke/bin/atlas-splitter extract missing.glb 2>&1 | grep -q Traceback
-          .wheel-smoke/bin/atlas-splitter extract missing.glb 2>&1 | grep -q 'atlas-splitter setup geometry'
+          set +e
+          output="$(.wheel-smoke/bin/atlas-splitter extract missing.glb 2>&1)"
+          code=$?
+          set -e
+          test "$code" -ne 0
+          echo "$output" | grep -q "atlas-splitter setup geometry"
+          ! echo "$output" | grep -q "Traceback"
   pipx-wheel-smoke:
     name: pipx wheel smoke
     runs-on: ubuntu-latest
@@ -52,8 +62,17 @@ jobs:
       - run: python -m pip install --upgrade pip build pipx
       - run: python -m build
       - run: pipx install dist/*.whl
+      - run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - run: atlas-splitter --version
       - run: atlas-splitter --help
-      - run: atlas-splitter doctor --format json || test $? -eq 1
+      - name: Verify pipx doctor result explicitly
+        run: |
+          set +e
+          output="$(atlas-splitter doctor --format json 2>&1)"
+          code=$?
+          set -e
+          test "$code" -eq 0 -o "$code" -eq 1
+          echo "$output"
   test:
     name: ${{ matrix.os }} / Python ${{ matrix.python }}
     runs-on: ${{ matrix.os }}

@@ -27,3 +27,20 @@ def test_zip_writer_never_includes_its_destination_inside_the_result(tmp_path) -
 
     with zipfile.ZipFile(destination) as archive:
         assert "atlas/atlas.zip" not in archive.namelist()
+
+
+def test_zip_writer_removes_temporary_file_after_a_write_exception(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    atlas = tmp_path / "atlas"
+    atlas.mkdir()
+    (atlas / "manifest.json").write_text("{}", encoding="utf-8")
+    destination = tmp_path / "bundle.zip"
+
+    def interrupted_write(*_args, **_kwargs) -> None:
+        raise KeyboardInterrupt()
+
+    monkeypatch.setattr(zipfile.ZipFile, "write", interrupted_write)
+    with pytest.raises(KeyboardInterrupt):
+        write_zip(destination, [atlas])
+
+    assert not destination.exists()
+    assert not destination.with_suffix(".zip.tmp").exists()

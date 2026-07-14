@@ -53,10 +53,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with: { path: dist }
-      - run: find dist -type f -exec cp {} dist/ \;
-      - run: test -f dist/atlas_splitter_blender.zip
-      - run: test -f dist/AtlasSplitter-Lite.zip
-      - run: sha256sum dist/* > dist/SHA256SUMS.txt
-      - run: gh release create "$GITHUB_REF_NAME" dist/*.whl dist/*.tar.gz dist/AtlasSplitter-Lite.zip dist/atlas_splitter_blender.zip dist/SHA256SUMS.txt CHANGELOG.md --title "$GITHUB_REF_NAME" --notes-file CHANGELOG.md
+      - run: python scripts/prepare_release_assets.py --version "${GITHUB_REF_NAME#v}" --python-artifacts dist/python-and-addon --windows-artifacts dist/windows-lite --output release-assets
+      - run: test -f release-assets/atlas_splitter-*.whl
+      - run: test -f release-assets/atlas_splitter-*.tar.gz
+      - run: test -f release-assets/AtlasSplitter-Lite.zip
+      - run: test -f release-assets/atlas_splitter_blender.zip
+      - run: gh release create "$GITHUB_REF_NAME" release-assets/* --title "$GITHUB_REF_NAME" --notes-file CHANGELOG.md
         env:
           GH_TOKEN: ${{ github.token }}

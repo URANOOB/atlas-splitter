@@ -1,13 +1,12 @@
 """Add-on mínimo de Atlas Splitter para Blender 4.x."""
 
-try:
-    from atlas_splitter import __version__ as _PACKAGE_VERSION
-except ImportError:  # El ZIP de Blender funciona sin instalar la CLI.
-    _PACKAGE_VERSION = "0.2.0"
+_PACKAGE_VERSION = "__ATLAS_SPLITTER_VERSION__"
 
 
 def _version_tuple(value: str) -> tuple[int, int, int]:
     """Convierte la versión del paquete al formato requerido por Blender."""
+    if value == "__ATLAS_SPLITTER_VERSION__":
+        return (0, 0, 0)
     parts = value.split(".")[:3]
     return tuple(int(part) for part in parts) + (0,) * (3 - len(parts))
 

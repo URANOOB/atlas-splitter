@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 
 from atlas_splitter import __version__
-from atlas_splitter.io.paths import ProjectPathError, resolve_project_path
+from atlas_splitter.io.paths import ProjectPathError, resolve_project_path, resolve_source_image
 
 
 def generate_html_report(destination: Path) -> Path:
@@ -45,7 +45,7 @@ def generate_html_report(destination: Path) -> Path:
         "</style><header><h1>Atlas Splitter</h1>"
         f"<p>Atlas Splitter {html.escape(__version__)} · separación visual aproximada: "
         "revisa y corrige las piezas ambiguas.</p>"
-        f"<img alt='Atlas original' src='{_data_uri(Path(source_file))}'></header><main>"
+        f"<img alt='Atlas original' src='{_data_uri(resolve_source_image(destination, manifest))}'></header><main>"
         + "".join(sections)
         + "</main></html>"
     )
@@ -96,10 +96,11 @@ def generate_semantic_html_report(destination: Path) -> Path:
             f"<article><h3>{name}</h3><p>Estado: {html.escape(status)} · Confianza: {confidence_text}</p>"
             f"{image}<p>Piezas: {labels}</p></article>"
         )
-    source = visual.get("source_file")
     atlas = ""
-    if isinstance(source, str) and Path(source).is_file():
-        atlas = f"<img alt='Atlas original' src='{_data_uri(Path(source))}'>"
+    try:
+        atlas = f"<img alt='Atlas original' src='{_data_uri(resolve_source_image(destination, visual))}'>"
+    except (FileNotFoundError, ProjectPathError):
+        atlas = "<p>Atlas original no disponible.</p>"
     unassigned = semantic.get("unassigned_piece_ids", [])
     unassigned_text = ", ".join(html.escape(str(piece)) for piece in unassigned) if isinstance(unassigned, list) else ""
     device = html.escape(str(semantic.get("device", "desconocido")))

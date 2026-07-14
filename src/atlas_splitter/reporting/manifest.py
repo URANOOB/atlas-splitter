@@ -21,6 +21,7 @@ def write_manifest(
     discarded: int,
     elements: list[MaskCandidate],
     elapsed_seconds: float,
+    source_file: str,
     runtime_device: str = "cpu",
 ) -> None:
     """Escribe metadatos reproducibles y asociaciones de cada elemento."""
@@ -32,7 +33,8 @@ def write_manifest(
             "geometry_available": False,
             "reconstruction_quality": "approximate_2d_only",
         },
-        "source_file": str(image.path.resolve()),
+        "source_file": source_file,
+        "source_file_portable": True,
         "sha256": image.sha256,
         "dimensions": {"width": image.width, "height": image.height, "channels": 4},
         "processed_at": datetime.now(UTC).isoformat(),

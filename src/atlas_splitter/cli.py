@@ -215,7 +215,7 @@ def _interactive_atlas_arguments(cwd: Path) -> list[str] | None:
         return None
     output = Path(typer.prompt("Carpeta de salida", default=str(cwd / "outputs"))).expanduser()
     padding = typer.prompt("Píxeles extra para recuperar bordes", default=4, type=int)
-    return ["run", str(source), "--output", str(output), "--calibration-pixels", str(padding)]
+    return ["split", str(source), "--output", str(output), "--calibration-pixels", str(padding)]
 
 
 def _interactive_glb_arguments(cwd: Path) -> list[str] | None:
@@ -229,7 +229,7 @@ def _interactive_glb_arguments(cwd: Path) -> list[str] | None:
     console.print("[dim]UV indica qué zona del atlas usa cada cara del modelo; no se modifica el GLB.[/dim]")
     console.print(f"[yellow]Si usa Draco, se comprobará el decodificador local en {cwd / 'draco' / 'gltf'}.[/yellow]")
     console.print("Al terminar, abre output/blender/rebuild_scene.py en Blender y ejecútalo desde Scripting.")
-    return ["glb", str(model), "--atlas-dir", str(atlas_directory), "--output", str(output)]
+    return ["extract", str(model), "--atlas-dir", str(atlas_directory), "--output", str(output)]
 
 
 def _prompt_existing_path(
@@ -338,7 +338,6 @@ def glb(
     ] = False,
 ) -> None:
     """Exporta regiones UV y materiales de un GLB/glTF enteramente local."""
-    _warn_deprecated("glb", "extract")
     if group_by not in {"node", "mesh", "primitive", "uv-island"}:
         raise typer.BadParameter(str(InputValidationError("--group-by debe ser node, mesh, primitive o uv-island")))
     if uv_tolerance <= 0:
@@ -447,10 +446,11 @@ def _required_atlas_directory(value: Path | None) -> Path:
 def extract(
     model: Annotated[Path, typer.Argument(help="Modelo GLB o glTF")],
     atlas: Annotated[Path | None, typer.Option(help="Atlas opcional si no está embebido")] = None,
+    atlas_dir: Annotated[Path | None, typer.Option(help="Directorio de atlas WEBP asociados por nodo")] = None,
     output: Annotated[Path, typer.Option(help="Carpeta de salida")] = Path("outputs"),
 ) -> None:
     """Atajo sencillo para extraer regiones UV exactas de un modelo."""
-    glb(model=model, atlas=atlas, output=output)
+    glb(model=model, atlas=atlas, atlas_dir=atlas_dir, output=output)
 
 
 @app.command()
@@ -628,7 +628,6 @@ def run(
     fail_fast_semantic: Annotated[bool, typer.Option(help="Detenerse al primer error semántico")] = False,
 ) -> None:
     """Procesa WEBP locales mediante segmentación clásica."""
-    _warn_deprecated("run", "split")
     try:
         loaded_config = load_config(config)
         effective_config = apply_cli_overrides(
@@ -732,9 +731,13 @@ def run(
 def split(
     atlas: Annotated[Path, typer.Argument(help="Atlas de texturas local")],
     output: Annotated[Path | None, typer.Option(help="Carpeta de salida")] = None,
+    calibration_pixels: Annotated[
+        int | None,
+        typer.Option("--calibration-pixels", "--edge-padding", help="Expande las máscaras para recuperar bordes"),
+    ] = None,
 ) -> None:
     """Atajo sencillo para separar visualmente un atlas sin geometría."""
-    run(source=atlas, output=output)
+    run(source=atlas, output=output, calibration_pixels=calibration_pixels)
 
 
 def translate_simple_args(arguments: list[str]) -> list[str]:
@@ -763,7 +766,7 @@ def translate_simple_args(arguments: list[str]) -> list[str]:
     }
     if not arguments or arguments[0] in commands or arguments[0].startswith("-"):
         return arguments
-    translated = ["run", arguments[0]]
+    translated = ["split", arguments[0]]
     remaining = arguments[1:]
     if remaining and not remaining[0].startswith("-"):
         translated.extend(("--output", remaining[0]))

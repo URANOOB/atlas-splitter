@@ -9,7 +9,7 @@ from pathlib import Path
 from atlas_splitter.config import GroupingConfig
 from atlas_splitter.io.grouped_psd_writer import write_grouped_psd
 from atlas_splitter.io.image_loader import load_image
-from atlas_splitter.io.paths import resolve_project_path
+from atlas_splitter.io.paths import resolve_project_path, resolve_source_image
 from atlas_splitter.reporting.annotated_atlas import write_annotated_atlas
 from atlas_splitter.reporting.candidate_group_sheet import write_candidate_group_sheet
 from atlas_splitter.reporting.group_preview import write_group_preview
@@ -75,10 +75,7 @@ def group_extracted_atlas(
     manifest = json.loads((destination / "manifest.json").read_text(encoding="utf-8"))
     if not isinstance(manifest, dict):
         raise ValueError("El manifest.json debe ser un objeto.")
-    source = manifest.get("source_file")
-    if not isinstance(source, str):
-        raise ValueError("El manifest.json no identifica el atlas fuente.")
-    image = load_image(Path(source))
+    image = load_image(resolve_source_image(destination, manifest))
     pieces = _pieces_from_manifest(destination, manifest)
     inputs = destination / "semantic_inputs"
     temporary_inputs = not config.keep_semantic_inputs

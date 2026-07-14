@@ -4,6 +4,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
 $root = Split-Path -Parent $PSScriptRoot
 $extras = if ($Edition -eq "AI") { ".[vision,semantic,geometry]" } else { ".[geometry]" }
 $packageName = "AtlasSplitter-$Edition"
@@ -13,7 +15,7 @@ $archive = Join-Path $root "dist/$packageName.zip"
 Push-Location $root
 try {
     & $Python -m pip install -e $extras pyinstaller
-    $arguments = @("--noconfirm", "--clean", "--onedir", "--name", $packageName, "--collect-all", "pygltflib")
+    $arguments = @("--noconfirm", "--clean", "--onedir", "--name", $packageName, "--collect-all", "pygltflib", "--add-data", "blender_addon;atlas_splitter/resources/blender_addon")
     if ($Edition -eq "Lite") {
         $arguments += @("--exclude-module", "torch", "--exclude-module", "transformers", "--exclude-module", "sam2")
     }
@@ -21,7 +23,7 @@ try {
     & $Python -m PyInstaller @arguments
 
     $executable = Join-Path $packageRoot "$packageName.exe"
-    foreach ($check in @(@("--help"), @("doctor"), @("inspect", "--help"))) {
+    foreach ($check in @(@("--version"), @("--help"), @("doctor", "--format", "json"), @("inspect", "--help"), @("blender-addon", "info"))) {
         & $executable @check
         if ($LASTEXITCODE -ne 0) { throw "La comprobación '$($check -join ' ')' falló con código $LASTEXITCODE." }
     }
@@ -38,11 +40,23 @@ try {
         "5. Usa setup geometry --yes antes de comandos GLB si hace falta."
     ) | Set-Content (Join-Path $packageRoot "README-WINDOWS.txt") -Encoding utf8
 
-    $addonDirectory = Join-Path $root "dist/blender-addon"
-    New-Item -ItemType Directory -Path $addonDirectory -Force | Out-Null
-    $addonArchive = Join-Path $addonDirectory "atlas_splitter_blender.zip"
-    Remove-Item $addonArchive -Force -ErrorAction SilentlyContinue
-    Compress-Archive -Path (Join-Path $root "blender_addon") -DestinationPath $addonArchive -Force
+    $addonSmoke = Join-Path $root "addon-smoke"
+    Remove-Item $addonSmoke -Recurse -Force -ErrorAction SilentlyContinue
+    & $executable blender-addon export --output $addonSmoke
+    if ($LASTEXITCODE -ne 0) { throw "La exportación del add-on falló con código $LASTEXITCODE." }
+    $addonArchive = Join-Path $addonSmoke "atlas_splitter_blender.zip"
+    if (-not (Test-Path -LiteralPath $addonArchive -PathType Leaf)) { throw "No se generó $addonArchive." }
+    $requiredAddonFiles = @("__init__.py", "operators.py", "panels.py", "properties.py", "manifest.py")
+    $archiveEntries = [IO.Compression.ZipFile]::OpenRead($addonArchive)
+    try {
+        $entryNames = @($archiveEntries.Entries | ForEach-Object { [IO.Path]::GetFileName($_.FullName) })
+        foreach ($required in $requiredAddonFiles) {
+            if ($entryNames -notcontains $required) { throw "El add-on exportado no contiene $required." }
+        }
+    }
+    finally {
+        $archiveEntries.Dispose()
+    }
     Copy-Item $addonArchive (Join-Path $packageRoot "atlas_splitter_blender.zip") -Force
 
     Remove-Item $archive -Force -ErrorAction SilentlyContinue

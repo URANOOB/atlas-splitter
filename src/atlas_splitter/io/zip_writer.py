@@ -15,6 +15,7 @@ def write_zip(destination: Path, atlas_directories: list[Path]) -> None:
     temporary = destination.with_suffix(destination.suffix + ".tmp")
     # Un intento interrumpido no debe contaminar una nueva publicación.
     temporary.unlink(missing_ok=True)
+    published = False
     try:
         with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             for atlas_directory in atlas_directories:
@@ -31,6 +32,7 @@ def write_zip(destination: Path, atlas_directories: list[Path]) -> None:
                         continue
                     archive.write(resolved_item, resolved_item.relative_to(root.parent))
         temporary.replace(destination)
-    except (OSError, zipfile.BadZipFile, zipfile.LargeZipFile):
-        temporary.unlink(missing_ok=True)
-        raise
+        published = True
+    finally:
+        if not published:
+            temporary.unlink(missing_ok=True)

@@ -57,7 +57,10 @@ def _write_resources(archive: zipfile.ZipFile, source: object, prefix: str) -> N
         if child.is_dir():
             _write_resources(archive, child, name)
         elif child.is_file() and "__pycache__" not in child.parts:
-            archive.writestr(name, child.read_bytes())
+            contents = child.read_bytes()
+            if child.name == "__init__.py":
+                contents = contents.replace(b"__ATLAS_SPLITTER_VERSION__", __version__.encode("ascii"))
+            archive.writestr(name, contents)
 
 
 def validate_blender_addon_zip(path: Path) -> None:

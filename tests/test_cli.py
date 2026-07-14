@@ -227,7 +227,7 @@ def test_setup_requires_confirmation_before_installing(monkeypatch) -> None:
 
 def test_simple_command_translates_output_and_calibration() -> None:
     arguments = translate_simple_args(["atlas.webp", "simple-output", "--calibration-pixels", "4"])
-    assert arguments == ["run", "atlas.webp", "--output", "simple-output", "--calibration-pixels", "4"]
+    assert arguments == ["split", "atlas.webp", "--output", "simple-output", "--calibration-pixels", "4"]
 
 
 def test_simple_command_keeps_glb_subcommand() -> None:
@@ -249,15 +249,36 @@ def test_doctor_uses_ascii_readiness_indicators() -> None:
     assert "[OK] Extraer atlas con GLB y UV" in result.stdout
 
 
-def test_interactive_atlas_mode_returns_simple_reproducible_run_args(tmp_path, monkeypatch) -> None:
+def test_interactive_atlas_mode_returns_public_split_args(tmp_path, monkeypatch) -> None:
     source = tmp_path / "atlas.webp"
     source.touch()
     answers = iter(["1", str(source), str(tmp_path / "output"), 6])
     monkeypatch.setattr("atlas_splitter.cli.typer.confirm", lambda *args, **kwargs: True)
     monkeypatch.setattr("atlas_splitter.cli.typer.prompt", lambda *args, **kwargs: next(answers))
     arguments = interactive_arguments(tmp_path)
-    assert arguments[:2] == ["run", str(source)]
+    assert arguments[:2] == ["split", str(source)]
     assert arguments[-1] == "6"
+
+
+def test_interactive_glb_mode_returns_public_extract_args(tmp_path, monkeypatch) -> None:
+    model = tmp_path / "room.glb"
+    model.touch()
+    atlas_directory = tmp_path / "atlases"
+    atlas_directory.mkdir()
+    answers = iter(["2", str(model), str(atlas_directory), str(tmp_path / "output")])
+    monkeypatch.setattr("atlas_splitter.cli.typer.confirm", lambda *args, **kwargs: True)
+    monkeypatch.setattr("atlas_splitter.cli.typer.prompt", lambda *args, **kwargs: next(answers))
+
+    arguments = interactive_arguments(tmp_path)
+
+    assert arguments == [
+        "extract",
+        str(model),
+        "--atlas-dir",
+        str(atlas_directory),
+        "--output",
+        str(tmp_path / "output"),
+    ]
 
 
 def test_interactive_menu_can_run_doctor_without_requesting_paths(tmp_path, monkeypatch) -> None:
