@@ -304,6 +304,16 @@ def _required_atlas_directory(value: Path | None) -> Path:
 
 
 @app.command()
+def extract(
+    model: Annotated[Path, typer.Argument(help="Modelo GLB o glTF")],
+    atlas: Annotated[Path | None, typer.Option(help="Atlas opcional si no está embebido")] = None,
+    output: Annotated[Path, typer.Option(help="Carpeta de salida")] = Path("outputs"),
+) -> None:
+    """Atajo sencillo para extraer regiones UV exactas de un modelo."""
+    glb(model=model, atlas=atlas, output=output)
+
+
+@app.command()
 def preview(output: Annotated[Path, typer.Argument(help="Directorio de una ejecución existente")]) -> None:
     """Regenera el reporte HTML local de una extracción visual ya terminada."""
     try:
@@ -517,11 +527,20 @@ def run(
             raise typer.Exit(code=1) from error
 
 
+@app.command()
+def split(
+    atlas: Annotated[Path, typer.Argument(help="Atlas de texturas local")],
+    output: Annotated[Path | None, typer.Option(help="Carpeta de salida")] = None,
+) -> None:
+    """Atajo sencillo para separar visualmente un atlas sin geometría."""
+    run(source=atlas, output=output)
+
+
 def translate_simple_args(arguments: list[str]) -> list[str]:
     """Traduce ``atlas-splitter archivo [salida]`` a la interfaz avanzada."""
     commands = {
-        "apply-review", "doctor", "glb", "install", "inspect", "models", "preview", "review", "semantic",
-        "semantic-3d", "semantic-models", "run",
+        "apply-review", "doctor", "extract", "glb", "install", "inspect", "models", "preview", "review",
+        "semantic", "semantic-3d", "semantic-models", "run", "split",
     }
     if not arguments or arguments[0] in commands or arguments[0].startswith("-"):
         return arguments
