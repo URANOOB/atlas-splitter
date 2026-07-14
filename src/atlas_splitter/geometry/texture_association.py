@@ -19,9 +19,15 @@ from atlas_splitter.geometry.texture_resolver import material_texture_bindings, 
 LOGGER = logging.getLogger(__name__)
 AssociationMethod = Literal["yaml", "image_hash", "normalized_name", "legacy_name"]
 _ORDINAL_TEXTURES = {
-    "first": "first-house", "second": "second-photos", "third": "third-desk", "fourth": "fourth-extras",
-    "fifth": "fifth-background", "sixth": "sixth-plants", "seventh": "seventh-large-stuff",
-    "eighth": "eighth-decor", "ninth": "ninth-attachment",
+    "first": "first-house",
+    "second": "second-photos",
+    "third": "third-desk",
+    "fourth": "fourth-extras",
+    "fifth": "fifth-background",
+    "sixth": "sixth-plants",
+    "seventh": "seventh-large-stuff",
+    "eighth": "eighth-decor",
+    "ninth": "ninth-attachment",
 }
 _ATLAS_SUFFIXES = {".webp", ".png", ".jpg", ".jpeg"}
 
@@ -57,9 +63,11 @@ def load_atlas_bindings(bindings_file: Path, loaded: LoadedGltf) -> list[AtlasAs
     associations: list[AtlasAssociation] = []
     seen_atlases: set[Path] = set()
     for position, item in enumerate(data["atlas_bindings"], start=1):
-        if not isinstance(item, dict) or not {"atlas", "nodes"} <= set(item) or set(item) - {
-            "atlas", "nodes", "texture_slot", "uv_set", "flip_v"
-        }:
+        if (
+            not isinstance(item, dict)
+            or not {"atlas", "nodes"} <= set(item)
+            or set(item) - {"atlas", "nodes", "texture_slot", "uv_set", "flip_v"}
+        ):
             raise GltfLoadError(f"Binding YAML #{position} debe incluir atlas y nodes; revise sus claves.")
         atlas_value, nodes_value = item["atlas"], item["nodes"]
         if not isinstance(atlas_value, str) or not isinstance(nodes_value, list) or not nodes_value:
@@ -104,7 +112,8 @@ def resolve_external_atlases(
     if not atlas_directory.is_dir():
         raise GltfLoadError(f"El directorio de atlas no existe: {atlas_directory}")
     atlases = sorted(
-        path.resolve() for path in atlas_directory.iterdir()
+        path.resolve()
+        for path in atlas_directory.iterdir()
         if path.is_file() and path.suffix.lower() in _ATLAS_SUFFIXES and ".original" not in path.stem
     )
     if not atlases:

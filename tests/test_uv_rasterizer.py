@@ -7,16 +7,12 @@ from atlas_splitter.geometry.uv_rasterizer import rasterize_uv_triangles, uv_to_
 
 
 def test_v_axis_is_inverted_from_gltf_to_image_pixels() -> None:
-    pixels = uv_to_pixel_coordinates(
-        np.array([[0.0, 0.0], [0.0, 1.0]]), 9, 7, "CLAMP_TO_EDGE", "CLAMP_TO_EDGE"
-    )
+    pixels = uv_to_pixel_coordinates(np.array([[0.0, 0.0], [0.0, 1.0]]), 9, 7, "CLAMP_TO_EDGE", "CLAMP_TO_EDGE")
     assert pixels.tolist() == [[0, 6], [0, 0]]
 
 
 def test_triangle_rasterization_is_not_its_bounding_box() -> None:
-    region = rasterize_uv_triangles(
-        np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]]), np.array([[0, 1, 2]]), 11, 11
-    )
+    region = rasterize_uv_triangles(np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]]), np.array([[0, 1, 2]]), 11, 11)
     assert region.bounding_box == (0, 0, 11, 11)
     assert region.mask.sum() < 11 * 11
     assert not region.mask[0, 10]
@@ -53,9 +49,7 @@ def test_uv_island_coordinates_support_repeat_ranges() -> None:
 
 def test_uv_edges_within_tolerance_connect_without_quantization_artifacts() -> None:
     triangles = np.array([[0, 1, 2], [3, 4, 5]])
-    uvs = np.array(
-        [[0, 0], [1, 0], [0, 1], [1 + 0.75e-6, 0], [-0.75e-6, 0], [1, 1]], dtype=float
-    )
+    uvs = np.array([[0, 0], [1, 0], [0, 1], [1 + 0.75e-6, 0], [-0.75e-6, 0], [1, 1]], dtype=float)
 
     assert [group.tolist() for group in uv_island_triangle_groups(triangles, uvs, tolerance=1e-6)] == [[0, 1]]
     assert [group.tolist() for group in uv_island_triangle_groups(triangles, uvs, tolerance=0.5e-6)] == [[0], [1]]

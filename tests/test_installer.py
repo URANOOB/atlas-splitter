@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from atlas_splitter.installer import InstallationError, create_isolated_environment
+from atlas_splitter.installer import InstallationError, create_isolated_environment, install_optional_components
 
 
 def test_installation_rejects_an_unknown_profile_before_creating_a_venv(tmp_path: Path) -> None:
@@ -25,3 +25,13 @@ def test_installation_accepts_the_visual_segmentation_profile(monkeypatch: pytes
     create_isolated_environment(tmp_path, tmp_path / "env", "vision")
 
     assert calls[-1][-1] == ".[vision]"
+
+
+def test_optional_install_uses_installed_package_not_the_current_directory(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[list[str]] = []
+    monkeypatch.setattr("atlas_splitter.installer.version", lambda _name: "0.1.0")
+    monkeypatch.setattr("atlas_splitter.installer.subprocess.run", lambda command, **_kwargs: calls.append(command))
+
+    install_optional_components("geometry", Path("python"))
+
+    assert calls == [["python", "-m", "pip", "install", "atlas-splitter[geometry]"]]

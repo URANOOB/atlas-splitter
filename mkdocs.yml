@@ -1,0 +1,38 @@
+site_name: Atlas Splitter
+site_description: Separación local de atlas 2D y extracción UV de GLB/glTF.
+repo_url: https://github.com/URANOOB/atlas-splitter
+theme:
+  name: material
+  language: es
+  features: [navigation.tabs, navigation.sections, content.code.copy]
+nav:
+  - Inicio: index.md
+  - Primeros pasos:
+      - Instalación: getting-started/installation.md
+      - Primer atlas: getting-started/first-split.md
+      - Primer GLB: getting-started/first-glb-extraction.md
+      - Windows portable: getting-started/windows-portable.md
+  - Guías:
+      - Segmentación visual: guides/visual-segmentation.md
+      - Extracción GLB y UV: guides/glb-uv-extraction.md
+      - Agrupación semántica: guides/semantic-grouping.md
+      - Revisión manual: guides/manual-review.md
+      - Blender: guides/blender.md
+  - Referencia:
+      - CLI: reference/cli.md
+      - Configuración: reference/configuration.md
+      - Manifiestos: reference/manifests.md
+      - Salida: reference/output-structure.md
+  - Conceptos:
+      - Atlas: concepts/texture-atlas.md
+      - Coordenadas UV: concepts/uv-coordinates.md
+      - Límites: concepts/limitations.md
+  - Problemas:
+      - Instalación: troubleshooting/installation.md
+      - CUDA y MPS: troubleshooting/cuda.md
+      - Blender: troubleshooting/blender.md
+      - GLB: troubleshooting/glb.md
+  - Proyecto:
+      - Contribuir: contributing.md
+      - Seguridad: security.md
+      - Cambios: changelog.md

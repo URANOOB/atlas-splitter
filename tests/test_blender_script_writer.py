@@ -108,7 +108,7 @@ def test_object_rebuild_script_uses_full_editable_atlas(tmp_path) -> None:
     contents = script.read_text(encoding="utf-8")
     assert "OBJECT_MANIFEST" in contents
     assert "ShaderNodeMapping" in contents
-    assert 'obj.data.materials.clear()' in contents
+    assert "obj.data.materials.clear()" in contents
     assert "def local_path(path):" in contents
     assert "TARGET_OBJECT_ID = None" in contents
     assert "Path(local_path(OBJECT_MANIFEST)).read_text" in contents
@@ -135,7 +135,7 @@ def test_atlas_script_filters_nodes_by_the_external_atlas(tmp_path) -> None:
     )
     contents = script.read_text(encoding="utf-8")
     assert 'TARGET_ATLAS_PATH = "' in contents
-    assert "kept_names = {item[\"node_name\"] for item in selected}" in contents
+    assert 'kept_names = {item["node_name"] for item in selected}' in contents
     assert "SEPARATE_LOOSE_PARTS = True" in contents
     assert 'bpy.ops.mesh.separate(type="LOOSE")' in contents
     compile(contents, str(destination), "exec")

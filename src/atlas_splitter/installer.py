@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import venv
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from atlas_splitter.models.manager import download_model
@@ -16,9 +17,27 @@ class InstallationError(RuntimeError):
     """No se pudo preparar el runtime local de atlas-splitter."""
 
 
-def create_isolated_environment(
-    project_root: Path, environment: Path | None = None, profile: str = "basic"
-) -> Path:
+OFFICIAL_REPOSITORY = "git+https://github.com/URANOOB/atlas-splitter.git"
+
+
+def install_optional_components(component: str, python_executable: Path | None = None) -> None:
+    """Instala extras sin depender del directorio actual."""
+    extras = {"geometry": "geometry", "ai": "vision,semantic", "all": "vision,semantic,geometry"}
+    if component not in extras:
+        raise InstallationError("Componente no compatible. Use geometry, ai o all.")
+    python = python_executable or Path(sys.executable)
+    try:
+        version("atlas-splitter")
+        requirement = f"atlas-splitter[{extras[component]}]"
+    except PackageNotFoundError:
+        requirement = f"atlas-splitter[{extras[component]}] @ {OFFICIAL_REPOSITORY}"
+    try:
+        subprocess.run([str(python), "-m", "pip", "install", requirement], check=True)
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise InstallationError(f"No se pudo instalar {component}: {error}") from error
+
+
+def create_isolated_environment(project_root: Path, environment: Path | None = None, profile: str = "basic") -> Path:
     """Instala atlas-splitter y sus extras en un virtualenv local multiplataforma."""
     extras = {
         "basic": ".",
@@ -37,9 +56,7 @@ def create_isolated_environment(
         if not python.is_file():
             raise InstallationError(f"El entorno aislado no contiene Python: {python}")
         subprocess.run([str(python), "-m", "pip", "install", "--upgrade", "pip"], check=True)
-        subprocess.run(
-            [str(python), "-m", "pip", "install", "-e", extras[profile]], cwd=project_root, check=True
-        )
+        subprocess.run([str(python), "-m", "pip", "install", "-e", extras[profile]], cwd=project_root, check=True)
     except (OSError, subprocess.CalledProcessError) as error:
         raise InstallationError(f"No se pudo crear el entorno aislado: {error}") from error
     return target

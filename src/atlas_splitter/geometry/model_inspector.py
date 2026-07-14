@@ -90,11 +90,7 @@ def _uv_sets(primitive: object) -> set[str]:
         values = attributes.items()
     else:
         values = vars(attributes).items() if attributes is not None else []
-    return {
-        str(name)
-        for name, value in values
-        if str(name).startswith("TEXCOORD_") and value is not None
-    }
+    return {str(name) for name, value in values if str(name).startswith("TEXCOORD_") and value is not None}
 
 
 def _material_name(materials: list[object], index: object) -> str:

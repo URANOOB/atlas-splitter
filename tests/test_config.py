@@ -6,8 +6,8 @@ from atlas_splitter.config import AppConfig, apply_cli_overrides, load_config, w
 
 def test_default_config_has_expected_values() -> None:
     config = load_config()
-    assert config.device == "cuda"
-    assert config.grouping.device == "cuda"
+    assert config.device == "auto"
+    assert config.grouping.device == "auto"
     assert config.segmentation.min_area == 400
     assert config.gltf.group_by == "uv-island"
     assert config.gltf.uv_tolerance == 1e-6

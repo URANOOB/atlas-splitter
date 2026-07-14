@@ -35,16 +35,14 @@ def test_exports_material_crops_masks_manifests_and_blender_script(tmp_path: Pat
                     {"bufferView": 1, "componentType": 5126, "count": 3, "type": "VEC2"},
                     {"bufferView": 2, "componentType": 5123, "count": 3, "type": "SCALAR"},
                 ],
-                "images": [{"uri": "paint.png"}], "textures": [{"source": 0}],
+                "images": [{"uri": "paint.png"}],
+                "textures": [{"source": 0}],
                 "materials": [{"pbrMetallicRoughness": {"baseColorTexture": {"index": 0}}}],
                 "meshes": [
-                    {
-                        "primitives": [
-                            {"attributes": {"POSITION": 0, "TEXCOORD_0": 1}, "indices": 2, "material": 0}
-                        ]
-                    }
+                    {"primitives": [{"attributes": {"POSITION": 0, "TEXCOORD_0": 1}, "indices": 2, "material": 0}]}
                 ],
-                "nodes": [{"mesh": 0}], "scenes": [{"nodes": [0]}],
+                "nodes": [{"mesh": 0}],
+                "scenes": [{"nodes": [0]}],
             }
         ),
         encoding="utf-8",
@@ -83,7 +81,8 @@ def test_exports_uvs_with_an_explicit_manual_atlas_when_glb_has_no_material(tmp_
                     {"bufferView": 2, "componentType": 5123, "count": 3, "type": "SCALAR"},
                 ],
                 "meshes": [{"primitives": [{"attributes": {"POSITION": 0, "TEXCOORD_0": 1}, "indices": 2}]}],
-                "nodes": [{"mesh": 0}], "scenes": [{"nodes": [0]}],
+                "nodes": [{"mesh": 0}],
+                "scenes": [{"nodes": [0]}],
             }
         ),
         encoding="utf-8",
@@ -149,10 +148,14 @@ def test_image_index_filters_a_multiatlas_node_to_its_declared_material(tmp_path
                     {"pbrMetallicRoughness": {"baseColorTexture": {"index": 0}}},
                     {"pbrMetallicRoughness": {"baseColorTexture": {"index": 1}}},
                 ],
-                "meshes": [{"primitives": [
-                    {"attributes": {"POSITION": 0, "TEXCOORD_0": 1}, "indices": 2, "material": 0},
-                    {"attributes": {"POSITION": 0, "TEXCOORD_0": 1}, "indices": 2, "material": 1},
-                ]}],
+                "meshes": [
+                    {
+                        "primitives": [
+                            {"attributes": {"POSITION": 0, "TEXCOORD_0": 1}, "indices": 2, "material": 0},
+                            {"attributes": {"POSITION": 0, "TEXCOORD_0": 1}, "indices": 2, "material": 1},
+                        ]
+                    }
+                ],
                 "nodes": [{"mesh": 0}],
                 "scenes": [{"nodes": [0]}],
             }
@@ -211,8 +214,7 @@ def test_group_by_modes_produce_distinct_deterministic_element_counts(tmp_path: 
     )
     loaded = load_gltf(model)
     manifests = {
-        mode: export_glb(loaded, tmp_path / mode, group_by=mode)
-        for mode in ("node", "mesh", "primitive", "uv-island")
+        mode: export_glb(loaded, tmp_path / mode, group_by=mode) for mode in ("node", "mesh", "primitive", "uv-island")
     }
     counts = {mode: len(manifest.elements) for mode, manifest in manifests.items()}
     assert counts == {"node": 2, "mesh": 1, "primitive": 4, "uv-island": 8}
@@ -252,11 +254,16 @@ def test_node_group_keeps_regions_and_auxiliary_maps_per_material(tmp_path: Path
                     {"pbrMetallicRoughness": {"baseColorTexture": {"index": 0}}},
                     {"pbrMetallicRoughness": {"baseColorTexture": {"index": 0}}, "normalTexture": {"index": 1}},
                 ],
-                "meshes": [{"primitives": [
-                    {"attributes": {"POSITION": 0, "TEXCOORD_0": 1}, "indices": 2, "material": 0},
-                    {"attributes": {"POSITION": 0, "TEXCOORD_0": 1}, "indices": 2, "material": 1},
-                ]}],
-                "nodes": [{"mesh": 0}], "scenes": [{"nodes": [0]}],
+                "meshes": [
+                    {
+                        "primitives": [
+                            {"attributes": {"POSITION": 0, "TEXCOORD_0": 1}, "indices": 2, "material": 0},
+                            {"attributes": {"POSITION": 0, "TEXCOORD_0": 1}, "indices": 2, "material": 1},
+                        ]
+                    }
+                ],
+                "nodes": [{"mesh": 0}],
+                "scenes": [{"nodes": [0]}],
             }
         ),
         encoding="utf-8",

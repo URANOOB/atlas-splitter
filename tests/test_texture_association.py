@@ -91,9 +91,7 @@ def test_automatic_association_records_normalized_name_evidence(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     (tmp_path / "brick-wall.webp").touch()
-    loaded = SimpleNamespace(
-        document=SimpleNamespace(images=[SimpleNamespace(uri="brick_wall.png")], nodes=[])
-    )
+    loaded = SimpleNamespace(document=SimpleNamespace(images=[SimpleNamespace(uri="brick_wall.png")], nodes=[]))
     monkeypatch.setattr("atlas_splitter.geometry.texture_association._nodes_using_image", lambda *_: {2})
 
     result = resolve_external_atlases(loaded, tmp_path)

@@ -380,9 +380,7 @@ def _manifest(
         "source_file": str(source.resolve()),
         "atlas_file": str(atlas.resolve()),
         "node": {
-            "name": (
-                primitives[0].node_path[-1] if primitives and primitives[0].node_path else _NODE_NAME
-            ),
+            "name": (primitives[0].node_path[-1] if primitives and primitives[0].node_path else _NODE_NAME),
             "node_index": primitives[0].reference.node_index if primitives else 0,
             "mesh_index": primitives[0].reference.mesh_index if primitives else None,
             "uv_set": config.uv_set,

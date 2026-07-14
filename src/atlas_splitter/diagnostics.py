@@ -108,7 +108,7 @@ def collect_diagnostics(
     ]
     torch_version = module_version("torch")
     if torch_version is None:
-        checks.append(DiagnosticCheck("PyTorch", False, "no instalado", critical=True))
+        checks.append(DiagnosticCheck("PyTorch", False, "no instalado"))
         checks.append(DiagnosticCheck("CUDA", False, "PyTorch no está disponible"))
     else:
         import torch
@@ -123,7 +123,7 @@ def collect_diagnostics(
             except (RuntimeError, AssertionError) as error:
                 cuda_available = False
                 cuda_detail = f"no disponible: {error}"
-        checks.append(DiagnosticCheck("PyTorch", True, torch_version, critical=True))
+        checks.append(DiagnosticCheck("PyTorch", True, torch_version))
         checks.append(DiagnosticCheck("CUDA", cuda_available, cuda_detail))
     checks.append(_check_pillow_webp(module_version))
     for label, module in (("Trimesh", "trimesh"), ("NetworkX", "networkx")):

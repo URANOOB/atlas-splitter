@@ -1,157 +1,52 @@
 # Atlas Splitter
 
-[![CI](https://github.com/URANOOB/atlas-splitter/actions/workflows/ci.yml/badge.svg)](https://github.com/URANOOB/atlas-splitter/actions/workflows/ci.yml) [![Python](https://img.shields.io/badge/python-3.11--3.13-blue)](pyproject.toml) [![Ruff](https://img.shields.io/badge/lint-Ruff-261230)](https://docs.astral.sh/ruff/) [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+Separa atlas de texturas localmente para editarlos como piezas 2D o extraer regiones UV exactas desde un GLB/glTF.
 
-> Convierte atlas de texturas en piezas editables mediante segmentación 2D o coordenadas UV exactas de GLB/glTF. Todo el procesamiento es local.
+![Objetos separados en Blender](docs/assets/semantic-first-house-separated.png)
 
-CLI local y multiplataforma para convertir atlas de texturas en artefactos editables. Funciona en PowerShell, CMD, bash y terminales de macOS/Linux. Los archivos de entrada se procesan localmente.
-
-## Inicio sencillo
-
-Después de instalar, ejecuta simplemente:
-
-```text
-atlas-splitter
-```
-
-Consulta las guías de [inicio rápido](docs/quick-start.md), [instalación en Windows](docs/windows-installation.md), [GLB y UV](docs/glb-and-uv-workflow.md) y [solución de problemas](docs/troubleshooting.md).
-
-El asistente ofrece atlas 2D, atlas+GLB/UV, `doctor` y modelos locales; valida rutas, permite volver al menú, muestra un resumen y devuelve el comando reproducible. El flujo básico no exige editar YAML.
-
-## Dos modos
-
-| Dispones de | Qué elige el asistente | Resultado |
+| Tengo | Debo usar | Precisión |
 | --- | --- | --- |
-| Sólo atlas WEBP | Segmentación 2D | PNG, máscaras, PSD, manifiesto, contact sheet y ZIP. Ajusta `processing.padding` o `--calibration-pixels` para recuperar bordes. |
-| GLB/glTF y atlas | Extracción guiada por UV | Máscaras UV exactas, recortes de material, manifiestos y scripts Blender con geometría editable. |
+| Atlas solamente | `split` | Aproximada |
+| Atlas y GLB/glTF | `extract` | Basada en UV |
+| Atlas sin GLB y deseo nombres | `semantic` | Inferencia visual |
 
-El modo GLB avisa si detecta `KHR_draco_mesh_compression`. Draco puede ser necesario para recuperar POSITION y UV; el proyecto usa únicamente el decodificador local de `draco/gltf` y nunca lo descarga durante una ejecución.
-
-Para First House existe además la prueba semántica 3D:
+## Instalación
 
 ```text
-atlas-splitter semantic-3d GLB/Room.glb Samples/day/first-house_day.webp --output outputs
+pipx install git+https://github.com/URANOOB/atlas-splitter.git
+atlas-splitter doctor
 ```
 
-Agrupa primero por conectividad y proximidad 3D; Qwen3-VL local sólo etiqueta las propuestas resultantes. No hace Join de las mallas.
+Las funciones extra se instalan desde cualquier carpeta, previa confirmación. Ningún modelo se descarga durante un procesamiento.
 
-### Resultado editable en Blender
-
-La reconstrucción semántica conserva los componentes como mallas editables bajo padres de grupo. En este ejemplo de First House, las piezas resultantes quedan separadas y organizadas en el Outliner, listas para inspección o edición individual:
-
-![First House separado en objetos editables dentro de Blender](docs/assets/semantic-first-house-separated.png)
-
-## Configuración
-
-Puedes usar YAML opcional para ajustar bordes en atlas sin GLB:
-
-```yaml
-device: cuda
-processing:
-  padding: 4
-segmentation:
-  sam2_edge_padding: 4
+```text
+atlas-splitter setup geometry
+atlas-splitter setup ai
+atlas-splitter setup all
 ```
 
-Usa `--device auto` para escoger CUDA, MPS o CPU de forma segura; `--device cpu` fuerza CPU.
-
-## Comandos directos
+## Tres comandos
 
 ```text
 atlas-splitter split atlas.webp --output resultados
 atlas-splitter extract modelo.glb --atlas atlas.webp --output resultados
-atlas-splitter group resultados/atlas
-atlas-splitter review resultados/atlas
-atlas-splitter apply-review resultados/atlas/review.json
-atlas-splitter preview resultados/atlas
-atlas-splitter inspect modelo.glb
-atlas-splitter inspect modelo.gltf --format json
-atlas-splitter doctor --format json
-atlas-splitter models list
-atlas-splitter semantic-models list
+atlas-splitter semantic atlas.webp --output resultados
 ```
 
-`split` usa recuperación visual aproximada. `extract` usa UV exactas cuando el modelo las incluye. `group` no descarga Qwen3-VL: solicita que esté instalado localmente. Usa `review` y `apply-review` para corregir grupos sin volver a procesar el atlas.
-
-## Instalación aislada
-
-También puede instalarse directamente desde GitHub con `pipx` (hasta que exista una publicación en PyPI):
+`split` genera `png/`, `masks/`, `psd/`, `manifest.json`, un reporte HTML y un ZIP. `extract` genera manifiestos UV y scripts de Blender. `semantic` usa Qwen3-VL local sólo si se descargó explícitamente:
 
 ```text
-pipx install git+https://github.com/URANOOB/atlas-splitter.git
+atlas-splitter semantic-models download qwen3-vl-2b
 ```
 
-La forma recomendada crea el entorno y dependencias sin tocar el Python global:
+## Límites
 
-```text
-atlas-splitter install
-```
-
-`inspect` no altera el modelo y muestra nodos, mallas, primitivas, materiales, UV sets, animaciones, Draco y candidatos de extracción. Con `--atlas-dir`, la asociación automática primero compara el contenido RGBA y dimensiones, y sólo usa nombres normalizados como evidencia de menor confianza. Si hay ambigüedad, proporciona `--bindings`.
-
-También puedes crear un entorno del proyecto sin tocar Python global:
-
-```powershell
-.\scripts\install.ps1 -Features geometry
-```
-
-```bash
-./scripts/install.sh geometry
-```
-
-También puede hacerse manualmente:
-
-```text
-python -m venv .atlas-splitter-venv
-```
-
-Actívalo y luego instala los extras necesarios desde el directorio del repositorio:
-
-```powershell
-.\.atlas-splitter-venv\Scripts\Activate.ps1
-pip install -e ".[vision,semantic,geometry]"
-```
-
-```bash
-source .atlas-splitter-venv/bin/activate
-pip install -e ".[vision,semantic,geometry]"
-```
-
-En macOS/Linux y Windows se usa el mismo ejecutable: `atlas-splitter`. Añade `atlas-splitter install --model sam2-small` sólo si deseas preparar también el runtime SAM 2 y su checkpoint.
-
-## Distribución Windows
-
-`scripts/build-windows-lite.ps1` produce dos ediciones locales con PyInstaller: `Lite` incluye inspección, UV, reportes y Blender; `AI` añade las dependencias de visión. Ninguna incluye modelos ni los descarga. `Lite` excluye PyTorch, Transformers y CUDA para reducir tamaño.
-
-## Herramientas empleadas
-
-- Python 3.11, 3.12 o 3.13 y Typer/Rich para la CLI.
-- NumPy, OpenCV y Pillow para máscaras, recortes y contact sheets.
-- PSD Tools para PSD editables.
-- PyTorch, SAM 2 y CUDA opcional para segmentación.
-- Transformers, Accelerate y Qwen3-VL local para etiquetas semánticas.
-- pygltflib y el decodificador Draco local para GLB/glTF, UV y mallas.
-- Blender (`bpy`, sólo dentro del script generado) para reconstrucción editable.
-- Pydantic y YAML para configuración y manifiestos versionados.
-
-## Verificación
-
-```text
-python -m pytest
-python -m ruff check .
-python -m mypy
-```
+La segmentación visual es una aproximación y los nombres de IA requieren revisión. Sin GLB/glTF no hay geometría ni coordenadas UV, así que no puede reconstruirse fielmente el objeto 3D.
 
 ## Documentación
 
-- [Inicio rápido](docs/quick-start.md)
-- [GLB, UV y bindings](docs/glb-and-uv-workflow.md)
-- [Salida generada](docs/output-structure.md)
-- [Flujo Blender](docs/blender-workflow.md)
-- [Agrupación semántica](docs/semantic-grouping.md)
-- [Instalación Linux y macOS](docs/linux-macos-installation.md)
-- [Solución de problemas](docs/troubleshooting.md)
+Guías de [instalación](docs/getting-started/installation.md), [primer atlas](docs/getting-started/first-split.md), [extracción GLB](docs/getting-started/first-glb-extraction.md), [Blender](docs/guides/blender.md) y [problemas](docs/troubleshooting/installation.md).
 
-## Privacidad y límites
+## Estado y licencia
 
-Las imágenes, GLB, manifiestos y modelos permanecen en el equipo. La calidad 2D depende de la segmentación visual; con GLB/UV se preserva la geometría declarada, pero un atlas externo ambiguo requiere confirmación. Las etiquetas semánticas son inferencias y se marcan como tales en sus manifiestos.
+Primera versión pública estable en preparación. Ejecuta `python -m pytest`, `python -m ruff check .`, `python -m mypy` y `python -m build` antes de publicar. Licencia [MIT](LICENSE).

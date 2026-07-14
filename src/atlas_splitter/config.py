@@ -51,7 +51,7 @@ class GroupingConfig(BaseModel):
     enabled: bool = False
     backend: Literal["qwen3-vl"] = "qwen3-vl"
     model: Literal["qwen3-vl-2b"] = "qwen3-vl-2b"
-    device: Literal["auto", "cpu", "cuda", "mps"] = "cuda"
+    device: Literal["auto", "cpu", "cuda", "mps"] = "auto"
     minimum_confidence: float = Field(default=0.70, ge=0.0, le=1.0)
     automatic_confidence: float = Field(default=0.80, ge=0.0, le=1.0)
     max_pieces_per_sheet: int = Field(default=25, ge=1)
@@ -92,7 +92,7 @@ class AppConfig(BaseModel):
     """Configuración completa, con valores seguros para el MVP."""
 
     model_config = ConfigDict(extra="forbid")
-    device: Literal["auto", "cpu", "cuda", "mps"] = "cuda"
+    device: Literal["auto", "cpu", "cuda", "mps"] = "auto"
     model: Literal["sam2-tiny", "sam2-small"] = "sam2-small"
     segmentation: SegmentationConfig = Field(default_factory=SegmentationConfig)
     processing: ProcessingConfig = Field(default_factory=ProcessingConfig)

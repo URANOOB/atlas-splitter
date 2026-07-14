@@ -62,6 +62,27 @@ def test_new_modes_expose_help() -> None:
     _help(["semantic-3d", "--help"])
 
 
+def test_base_cli_help_does_not_import_geometry(monkeypatch) -> None:
+    import importlib
+
+    original = importlib.import_module
+
+    def no_geometry(name: str, *args, **kwargs):
+        if name.startswith("atlas_splitter.geometry"):
+            raise ModuleNotFoundError("No module named 'pygltflib'")
+        return original(name, *args, **kwargs)
+
+    monkeypatch.setattr("atlas_splitter.cli.importlib.import_module", no_geometry)
+
+    _help(["--help"])
+    _help(["doctor", "--help"])
+    _help(["split", "--help"])
+    _help(["extract", "--help"])
+    result = runner.invoke(app, ["extract", "model.glb"])
+    assert result.exit_code != 0
+    assert "atlas-splitter setup geometry" in result.stderr
+
+
 def test_inspect_glb_prints_text_and_json(monkeypatch, tmp_path) -> None:
     source = tmp_path / "model.glb"
     source.touch()
@@ -165,6 +186,35 @@ def test_cli_creates_and_inspects_zip(tmp_path) -> None:
     assert "1 elementos" in inspected.stdout
 
 
+def test_run_creates_default_zip_and_no_zip_disables_it(tmp_path) -> None:
+    from PIL import Image
+
+    source = tmp_path / "atlas.webp"
+    Image.new("RGBA", (20, 20), (255, 0, 0, 255)).save(source, "WEBP", lossless=True)
+    output = tmp_path / "output"
+
+    created = runner.invoke(app, ["run", str(source), "--output", str(output), "--min-area", "20"])
+    assert created.exit_code == 0
+    assert (output / "atlas-atlas-splitter.zip").is_file()
+
+    second = tmp_path / "other.webp"
+    Image.new("RGBA", (20, 20), (0, 255, 0, 255)).save(second, "WEBP", lossless=True)
+    disabled = runner.invoke(app, ["run", str(second), "--output", str(output), "--min-area", "20", "--no-zip"])
+    assert disabled.exit_code == 0
+    assert not (output / "other-atlas-splitter.zip").exists()
+
+
+def test_setup_requires_confirmation_before_installing(monkeypatch) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr("atlas_splitter.cli.typer.confirm", lambda *args, **kwargs: False)
+    monkeypatch.setattr("atlas_splitter.cli.install_optional_components", lambda value: calls.append(value))
+
+    result = runner.invoke(app, ["setup", "geometry"])
+
+    assert result.exit_code == 0
+    assert calls == []
+
+
 def test_simple_command_translates_output_and_calibration() -> None:
     arguments = translate_simple_args(["atlas.webp", "simple-output", "--calibration-pixels", "4"])
     assert arguments == ["run", "atlas.webp", "--output", "simple-output", "--calibration-pixels", "4"]
@@ -201,5 +251,5 @@ def test_interactive_atlas_mode_returns_simple_reproducible_run_args(tmp_path, m
 
 
 def test_interactive_menu_can_run_doctor_without_requesting_paths(tmp_path, monkeypatch) -> None:
-    monkeypatch.setattr("atlas_splitter.cli.typer.prompt", lambda *args, **kwargs: "3")
+    monkeypatch.setattr("atlas_splitter.cli.typer.prompt", lambda *args, **kwargs: "5")
     assert interactive_arguments(tmp_path) == ["doctor"]

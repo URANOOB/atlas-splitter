@@ -5,6 +5,7 @@ try:
 except ImportError:
     CLASSES = ()
 else:
+
     class ATLAS_PT_panel(bpy.types.Panel):
         bl_label = "Atlas Splitter"
         bl_idname = "ATLAS_PT_panel"
@@ -16,9 +17,11 @@ else:
             layout = self.layout
             layout.operator("atlas_splitter.load_project", icon="FILE_FOLDER")
             layout.operator("atlas_splitter.create_review_collections", icon="OUTLINER_COLLECTION")
-            path = context.scene.get("atlas_splitter_project")
+            layout.operator("atlas_splitter.rebuild_objects", icon="FILE_REFRESH")
+            project = context.scene.atlas_splitter_project
+            path = project.manifest_path
             if path:
                 layout.label(text=path)
-                layout.label(text=f"Atlas: {context.scene.get('atlas_splitter_atlas_count', 0)}")
+                layout.label(text=f"Atlas: {project.atlas_count}")
 
     CLASSES = (ATLAS_PT_panel,)

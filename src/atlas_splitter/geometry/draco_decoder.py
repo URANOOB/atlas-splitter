@@ -61,7 +61,9 @@ class DracoDecoder:
         view_index = extension.get("bufferView")
         attributes = extension.get("attributes")
         if not isinstance(view_index, int) or not isinstance(attributes, dict) or not attributes:
-            self._fail("invalid_draco_extension", "KHR_draco_mesh_compression no declara bufferView/attributes válidos.")
+            self._fail(
+                "invalid_draco_extension", "KHR_draco_mesh_compression no declara bufferView/attributes válidos."
+            )
         encoded = _buffer_view_bytes(loaded, view_index)
         request = {"bytes": base64.b64encode(encoded).decode("ascii"), "attributes": attributes}
         try:
@@ -73,7 +75,11 @@ class DracoDecoder:
                     _node_process_path(self.decoder_js, self.node_executable),
                     _node_process_path(self.decoder_wasm, self.node_executable),
                 ],
-                input=json.dumps(request), text=True, capture_output=True, check=False, timeout=30,
+                input=json.dumps(request),
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=30,
             )
         except (OSError, subprocess.TimeoutExpired) as error:
             self._fail("draco_process_failed", f"No se pudo ejecutar el decodificador Draco local: {error}")
@@ -84,10 +90,7 @@ class DracoDecoder:
             payload = json.loads(completed.stdout)
             raw_attributes = payload["attributes"]
             raw_faces = payload["faces"]
-            result = {
-                str(name): np.asarray(values, dtype=np.float64)
-                for name, values in dict(raw_attributes).items()
-            }
+            result = {str(name): np.asarray(values, dtype=np.float64) for name, values in dict(raw_attributes).items()}
             faces = np.asarray(raw_faces, dtype=np.int64)
         except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
             self._fail("invalid_draco_output", f"La salida de Draco no tiene el formato esperado: {error}")
@@ -148,7 +151,7 @@ def _node_process_path(path: Path, node_executable: Path | None) -> str:
     return str(path.resolve())
 
 
-_NODE_PROGRAM = r'''const fs = require("fs");
+_NODE_PROGRAM = r"""const fs = require("fs");
 const [decoderPath, wasmPath] = process.argv.slice(1);
 const DracoDecoderModule = require(decoderPath);
 const input = JSON.parse(fs.readFileSync(0, "utf8"));
@@ -176,4 +179,4 @@ const input = JSON.parse(fs.readFileSync(0, "utf8"));
   for (let i = 0; i < mesh.num_faces(); i++) { decoder.GetFaceFromMesh(mesh, i, face); faces.push([face.GetValue(0), face.GetValue(1), face.GetValue(2)]); }
   module.destroy(face); module.destroy(mesh); module.destroy(decoder); module.destroy(buffer);
   process.stdout.write(JSON.stringify({ attributes, faces }));
-})().catch(error => { process.stderr.write(String(error.stack || error)); process.exitCode = 1; });'''
+})().catch(error => { process.stderr.write(String(error.stack || error)); process.exitCode = 1; });"""

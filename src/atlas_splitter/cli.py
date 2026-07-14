@@ -1,22 +1,19 @@
 """Interfaz de línea de comandos de atlas-splitter."""
 
+import importlib
 import json
 import logging
 import sys
 from pathlib import Path
-from typing import Annotated, cast
+from typing import Annotated, Any, cast
 
+import click
 import typer
 from pydantic import ValidationError
 from rich.console import Console
 from rich.table import Table
 from typer.main import get_command
 
-from atlas_splitter.blender.script_writer import (
-    write_atlas_rebuild_script,
-    write_object_rebuild_script,
-    write_single_object_rebuild_script,
-)
 from atlas_splitter.config import GroupingConfig, apply_cli_overrides, load_config
 from atlas_splitter.diagnostics import collect_diagnostics, has_critical_failures
 from atlas_splitter.domain import slugify
@@ -29,13 +26,7 @@ from atlas_splitter.exceptions import (
     SemanticInferenceError,
     SemanticModelUnavailableError,
 )
-from atlas_splitter.geometry.glb_exporter import GroupBy, export_glb
-from atlas_splitter.geometry.glb_loader import load_gltf
-from atlas_splitter.geometry.model_inspector import inspect_model
-from atlas_splitter.geometry.object_grouping import ExportedAtlas, write_object_manifest
-from atlas_splitter.geometry.project_writer import write_project_manifest
-from atlas_splitter.geometry.texture_association import load_atlas_bindings, resolve_external_atlases
-from atlas_splitter.installer import InstallationError, create_isolated_environment, install_runtime
+from atlas_splitter.installer import InstallationError, install_optional_components
 from atlas_splitter.io.image_loader import ImageLoadError, discover_images
 from atlas_splitter.io.zip_writer import write_zip
 from atlas_splitter.models.manager import download_model as fetch_model
@@ -44,10 +35,6 @@ from atlas_splitter.models.registry import MODELS, get_model
 from atlas_splitter.pipeline import process_image
 from atlas_splitter.reporting.html_report import generate_html_report
 from atlas_splitter.review import apply_review, create_review_template
-from atlas_splitter.segmentation.sam2_engine import Sam2Engine
-from atlas_splitter.semantic.grouping_service import group_extracted_atlas
-from atlas_splitter.semantic.qwen3_vl_engine import Qwen3VLSemanticGroupingBackend
-from atlas_splitter.semantic3d import Semantic3DConfig, group_semantic_3d
 from atlas_splitter.semantic_models.manager import download_semantic_model, is_semantic_model_downloaded
 from atlas_splitter.semantic_models.registry import SEMANTIC_MODELS, get_semantic_model
 
@@ -55,9 +42,102 @@ app = typer.Typer(help="Separa atlas de texturas mediante procesamiento local.",
 models_app = typer.Typer(help="Gestiona checkpoints de SAM 2.", no_args_is_help=True)
 semantic_models_app = typer.Typer(help="Gestiona modelos semánticos locales.", no_args_is_help=True)
 app.add_typer(models_app, name="models")
-app.add_typer(semantic_models_app, name="semantic-models")
+app.add_typer(semantic_models_app, name="semantic-models", hidden=True)
 console = Console()
 LOGGER = logging.getLogger(__name__)
+
+
+def _optional_message(component: str) -> str:
+    return (
+        f"La funci\u00f3n requiere el componente {component}.\n\n"
+        f"Inst\u00e1lalo con:\n\natlas-splitter setup {component.lower()}"
+    )
+
+
+def _optional_symbol(module: str, symbol: str, component: str) -> Any:
+    """Carga una capacidad opcional s\u00f3lo al ejecutar su comando."""
+    try:
+        return getattr(importlib.import_module(module), symbol)
+    except ImportError as error:
+        raise typer.BadParameter(_optional_message(component)) from error
+
+
+def _call_optional(
+    module: str, symbol: str, component: str, args: tuple[object, ...], kwargs: dict[str, object]
+) -> Any:
+    return _optional_symbol(module, symbol, component)(*args, **kwargs)
+
+
+def load_gltf(*args: object, **kwargs: object) -> Any:
+    return _call_optional("atlas_splitter.geometry.glb_loader", "load_gltf", "Geometry", args, kwargs)
+
+
+def export_glb(*args: object, **kwargs: object) -> Any:
+    return _call_optional("atlas_splitter.geometry.glb_exporter", "export_glb", "Geometry", args, kwargs)
+
+
+def inspect_model(*args: object, **kwargs: object) -> Any:
+    return _call_optional("atlas_splitter.geometry.model_inspector", "inspect_model", "Geometry", args, kwargs)
+
+
+def load_atlas_bindings(*args: object, **kwargs: object) -> Any:
+    return _call_optional(
+        "atlas_splitter.geometry.texture_association", "load_atlas_bindings", "Geometry", args, kwargs
+    )
+
+
+def resolve_external_atlases(*args: object, **kwargs: object) -> Any:
+    return _call_optional(
+        "atlas_splitter.geometry.texture_association", "resolve_external_atlases", "Geometry", args, kwargs
+    )
+
+
+def write_object_manifest(*args: object, **kwargs: object) -> Any:
+    return _call_optional("atlas_splitter.geometry.object_grouping", "write_object_manifest", "Geometry", args, kwargs)
+
+
+def write_project_manifest(*args: object, **kwargs: object) -> Any:
+    return _call_optional("atlas_splitter.geometry.project_writer", "write_project_manifest", "Geometry", args, kwargs)
+
+
+def write_atlas_rebuild_script(*args: object, **kwargs: object) -> Any:
+    return _call_optional(
+        "atlas_splitter.blender.script_writer", "write_atlas_rebuild_script", "Geometry", args, kwargs
+    )
+
+
+def write_object_rebuild_script(*args: object, **kwargs: object) -> Any:
+    return _call_optional(
+        "atlas_splitter.blender.script_writer", "write_object_rebuild_script", "Geometry", args, kwargs
+    )
+
+
+def write_single_object_rebuild_script(*args: object, **kwargs: object) -> Any:
+    return _call_optional(
+        "atlas_splitter.blender.script_writer", "write_single_object_rebuild_script", "Geometry", args, kwargs
+    )
+
+
+def _sam2_engine(*args: object, **kwargs: object) -> Any:
+    return _call_optional("atlas_splitter.segmentation.sam2_engine", "Sam2Engine", "AI", args, kwargs)
+
+
+def _semantic_backend(*args: object, **kwargs: object) -> Any:
+    return _call_optional(
+        "atlas_splitter.semantic.qwen3_vl_engine", "Qwen3VLSemanticGroupingBackend", "AI", args, kwargs
+    )
+
+
+def _group_extracted_atlas(*args: object, **kwargs: object) -> Any:
+    return _call_optional("atlas_splitter.semantic.grouping_service", "group_extracted_atlas", "AI", args, kwargs)
+
+
+def _group_semantic_3d(*args: object, **kwargs: object) -> Any:
+    return _call_optional("atlas_splitter.semantic3d", "group_semantic_3d", "Geometry", args, kwargs)
+
+
+def _semantic_3d_config(*args: object, **kwargs: object) -> Any:
+    return _call_optional("atlas_splitter.semantic3d", "Semantic3DConfig", "Geometry", args, kwargs)
 
 
 @app.callback()
@@ -74,21 +154,32 @@ def _planned(command: str) -> None:
     raise typer.Exit(code=2)
 
 
+def _warn_deprecated(command: str, replacement: str) -> None:
+    """Muestra el aviso sólo para el alias invocado, no para sus atajos públicos."""
+    context = click.get_current_context(silent=True)
+    if context is None or context.info_name == command:
+        console.print(f"[yellow]`{command}` es un alias avanzado; usa `{replacement}`.[/yellow]")
+
+
 def interactive_arguments(cwd: Path) -> list[str]:
     """Guía local con rutas validadas y devuelve un comando reproducible."""
     while True:
         console.print("\n[bold]Atlas Splitter[/bold] — un atlas es una imagen con varias texturas.")
         choice = typer.prompt(
-            "Elige: 1) atlas 2D, 2) atlas + GLB/UV, 3) doctor, 4) modelos locales",
+            "¿Qué deseas hacer?\n1. Separar un atlas 2D\n2. Extraer texturas usando un GLB\n"
+            "3. Agrupar piezas con IA\n4. Revisar un resultado\n5. Comprobar el sistema",
             default="1",
         ).strip()
-        if choice == "3":
+        if choice == "5":
             return ["doctor"]
-        if choice == "4":
-            return ["models", "list"]
-        if choice not in {"1", "2"}:
-            console.print("[yellow]Elige 1, 2, 3 o 4.[/yellow]")
+        if choice not in {"1", "2", "3", "4"}:
+            console.print("[yellow]Elige un número del 1 al 5.[/yellow]")
             continue
+        if choice in {"3", "4"}:
+            output = _prompt_existing_path("Carpeta de resultados (vacío = atrás)", directory=True)
+            if output is None:
+                continue
+            return ["group" if choice == "3" else "review", str(output)]
         if choice == "2":
             arguments = _interactive_glb_arguments(cwd)
         else:
@@ -138,8 +229,10 @@ def _prompt_existing_path(
         if not raw:
             return None
         path = Path(raw).expanduser()
-        valid = (file_or_directory and (path.is_file() or path.is_dir())) or (directory and path.is_dir()) or (
-            suffixes is not None and path.is_file() and path.suffix.lower() in suffixes
+        valid = (
+            (file_or_directory and (path.is_file() or path.is_dir()))
+            or (directory and path.is_dir())
+            or (suffixes is not None and path.is_file() and path.suffix.lower() in suffixes)
         )
         if valid:
             return path
@@ -152,9 +245,7 @@ def doctor(format: Annotated[str, typer.Option("--format", help="text o json")] 
     checks = collect_diagnostics()
     if format == "json":
         payload = [{"name": item.name, "ok": item.ok, "status": item.status, "detail": item.detail} for item in checks]
-        console.print_json(
-            json.dumps(payload)
-        )
+        console.print_json(json.dumps(payload))
         if has_critical_failures(checks):
             raise typer.Exit(code=1)
         return
@@ -178,6 +269,29 @@ def doctor(format: Annotated[str, typer.Option("--format", help="text o json")] 
 
 
 @app.command()
+def setup(
+    component: Annotated[str | None, typer.Argument(help="geometry, ai o all", show_default=False)] = None,
+    yes: Annotated[bool, typer.Option("--yes", help="Confirma las descargas de dependencias")] = False,
+) -> None:
+    """Comprueba el entorno o instala una capacidad opcional."""
+    if component is None:
+        doctor()
+        console.print("\nUsa `atlas-splitter setup geometry`, `setup ai` o `setup all` para a\u00f1adir capacidades.")
+        return
+    if component not in {"geometry", "ai", "all"}:
+        raise typer.BadParameter("Use geometry, ai o all.", param_hint="component")
+    console.print(f"Se descargar\u00e1n dependencias para {component}; no se descargar\u00e1n modelos.")
+    if not yes and not typer.confirm("\u00bfContinuar?", default=False):
+        console.print("Instalaci\u00f3n cancelada.")
+        return
+    try:
+        install_optional_components(component)
+    except InstallationError as error:
+        raise typer.BadParameter(str(error), param_hint="component") from error
+    console.print(f"[green]Componente {component} listo.[/green]")
+
+
+@app.command(hidden=True)
 def glb(
     model: Annotated[Path, typer.Argument(help="Archivo GLB o glTF local")],
     atlas: Annotated[Path | None, typer.Option(help="Atlas externo opcional")] = None,
@@ -199,6 +313,7 @@ def glb(
     ] = False,
 ) -> None:
     """Exporta regiones UV y materiales de un GLB/glTF enteramente local."""
+    _warn_deprecated("glb", "extract")
     if group_by not in {"node", "mesh", "primitive", "uv-island"}:
         raise typer.BadParameter(str(InputValidationError("--group-by debe ser node, mesh, primitive o uv-island")))
     if uv_tolerance <= 0:
@@ -220,7 +335,7 @@ def glb(
                 else resolve_external_atlases(loaded, _required_atlas_directory(atlas_dir), texture_slot)
             )
             exported_atlases = [
-                ExportedAtlas(
+                _optional_symbol("atlas_splitter.geometry.object_grouping", "ExportedAtlas", "Geometry")(
                     atlas_path=association.atlas_path,
                     output_directory=output / association.atlas_path.stem,
                     manifest=export_glb(
@@ -230,7 +345,7 @@ def glb(
                         texture_index=texture_index,
                         image_index=association.image_index,
                         texture_slot=association.texture_slot,
-                        group_by=cast(GroupBy, group_by),
+                        group_by=cast(Any, group_by),
                         allow_unbound_atlas=allow_unbound_atlas or association.manual_confirmation,
                         node_indices=set(association.node_indices),
                         flip_v=association.flip_v if bindings is not None else flip_v,
@@ -280,7 +395,7 @@ def glb(
                 atlas=atlas,
                 texture_index=texture_index,
                 texture_slot=texture_slot,
-                group_by=cast(GroupBy, group_by),
+                group_by=cast(Any, group_by),
                 allow_unbound_atlas=allow_unbound_atlas,
                 flip_v=flip_v,
                 uv_tolerance=uv_tolerance,
@@ -333,7 +448,7 @@ def review(output: Annotated[Path, typer.Argument(help="Directorio de una ejecuc
     console.print(f"[green]Revisión creada:[/green] {template}")
 
 
-@app.command("apply-review")
+@app.command("apply-review", hidden=True)
 def apply_manual_review(review_file: Annotated[Path, typer.Argument(help="Archivo review.json editable")]) -> None:
     """Aplica grupos manuales sin modificar los PNG ni las máscaras originales."""
     try:
@@ -355,11 +470,9 @@ def group(
         config = GroupingConfig.model_validate({"enabled": True, "device": device})
     except ValidationError as error:
         raise typer.BadParameter(str(error), param_hint="--device") from error
-    backend = Qwen3VLSemanticGroupingBackend(
-        config.model, config.device, config.minimum_confidence, config.automatic_confidence
-    )
+    backend = _semantic_backend(config.model, config.device, config.minimum_confidence, config.automatic_confidence)
     try:
-        group_extracted_atlas(output, config, backend)
+        _group_extracted_atlas(output, config, backend)
     except (SemanticInferenceError, SemanticModelUnavailableError, OSError, ValueError) as error:
         raise typer.BadParameter(str(error), param_hint="output") from error
     finally:
@@ -372,19 +485,24 @@ def semantic(
     atlas: Annotated[Path, typer.Argument(help="Atlas local sin GLB")],
     output: Annotated[Path, typer.Option(help="Directorio de resultados")] = Path("outputs"),
 ) -> None:
-    """Informa las limitaciones del modo semántico sin geometría."""
+    """Separa visualmente un atlas y agrupa sus piezas con IA local."""
     if not atlas.is_file():
         raise typer.BadParameter("El atlas no existe", param_hint="atlas")
     console.print(
-        "[yellow]ADVERTENCIA: este modo no dispone de geometría ni coordenadas UV.\n"
-        "Los resultados son inferencias visuales 2D y no permiten reconstruir\n"
-        "de forma fiable el objeto 3D original.[/yellow]"
+        "[yellow]Este modo no dispone de geometría ni coordenadas UV.\n"
+        "Los resultados son aproximaciones visuales y no permiten reconstruir fielmente el objeto 3D original.[/yellow]"
     )
-    console.print(f"[cyan]Atlas:[/cyan] {atlas}; salida prevista: {output}")
+    if not is_semantic_model_downloaded("qwen3-vl-2b"):
+        raise typer.BadParameter(
+            "Qwen3-VL no está instalado localmente. Instálalo con:\n"
+            "atlas-splitter semantic-models download qwen3-vl-2b",
+            param_hint="atlas",
+        )
+    run(source=atlas, output=output, auto_group=True)
 
 
-@app.command("semantic-3d")
-def semantic_3d(
+@app.command("group-3d")
+def group_3d(
     model: Annotated[Path, typer.Argument(help="GLB/glTF local")],
     atlas: Annotated[Path, typer.Argument(help="Atlas local confirmado por la persona usuaria")],
     output: Annotated[Path, typer.Option(help="Raíz de salida GLB")] = Path("outputs"),
@@ -402,14 +520,14 @@ def semantic_3d(
         raise typer.BadParameter("El GLB o atlas solicitado no existe localmente.")
     if not is_semantic_model_downloaded("qwen3-vl-2b"):
         raise typer.BadParameter("qwen3-vl-2b no está disponible localmente; no se descargará durante run.")
-    backend = Qwen3VLSemanticGroupingBackend("qwen3-vl-2b", device, minimum_confidence, minimum_confidence)
+    backend = _semantic_backend("qwen3-vl-2b", device, minimum_confidence, minimum_confidence)
     try:
-        destination = group_semantic_3d(
+        destination = _group_semantic_3d(
             model,
             atlas,
             output,
             backend,
-            Semantic3DConfig(minimum_confidence, proximity_factor, flip_v, texture_index, uv_set),
+            _semantic_3d_config(minimum_confidence, proximity_factor, flip_v, texture_index, uv_set),
             node_index=node,
             mesh_index=mesh_index,
         )
@@ -420,7 +538,18 @@ def semantic_3d(
     console.print(f"[green]Objetos semánticos 3D:[/green] {destination}")
 
 
-@app.command()
+@app.command("semantic-3d", hidden=True)
+def semantic_3d_alias(
+    model: Annotated[Path, typer.Argument(help="GLB/glTF local")],
+    atlas: Annotated[Path, typer.Argument(help="Atlas local")],
+    output: Annotated[Path, typer.Option(help="Raíz de salida GLB")] = Path("outputs"),
+) -> None:
+    """Alias temporal deprecado de ``group-3d``."""
+    console.print("[yellow]`semantic-3d` será retirado. Usa `group-3d`.[/yellow]")
+    group_3d(model=model, atlas=atlas, output=output)
+
+
+@app.command(hidden=True)
 def run(
     source: Annotated[Path, typer.Argument(help="Archivo WEBP o directorio de entrada")],
     config: Annotated[Path | None, typer.Option(help="Archivo de configuración YAML")] = None,
@@ -428,6 +557,7 @@ def run(
     model: Annotated[str | None, typer.Option(help="sam2-tiny o sam2-small")] = None,
     output: Annotated[Path | None, typer.Option(help="Directorio de resultados")] = None,
     zip_path: Annotated[Path | None, typer.Option("--zip", help="ZIP de salida")] = None,
+    no_zip: Annotated[bool, typer.Option("--no-zip", help="No crear archivo ZIP")] = False,
     min_area: Annotated[int | None, typer.Option(help="Área mínima de máscara")] = None,
     confidence: Annotated[float | None, typer.Option(help="Confianza mínima")] = None,
     stability: Annotated[float | None, typer.Option(help="Estabilidad mínima")] = None,
@@ -462,6 +592,7 @@ def run(
     fail_fast_semantic: Annotated[bool, typer.Option(help="Detenerse al primer error semántico")] = False,
 ) -> None:
     """Procesa WEBP locales mediante segmentación clásica."""
+    _warn_deprecated("run", "split")
     try:
         loaded_config = load_config(config)
         effective_config = apply_cli_overrides(
@@ -501,7 +632,7 @@ def run(
         console.print("[cyan]Salida predeterminada:[/cyan] outputs/")
     failures = 0
     completed: list[Path] = []
-    sam_engine = Sam2Engine(
+    sam_engine = _sam2_engine(
         effective_config.model,
         effective_config.device,
         effective_config.segmentation.sam2_points_per_side,
@@ -522,7 +653,7 @@ def run(
     finally:
         sam_engine.close()
     if effective_config.grouping.enabled and completed:
-        semantic_backend = Qwen3VLSemanticGroupingBackend(
+        semantic_backend = _semantic_backend(
             effective_config.grouping.model,
             effective_config.grouping.device,
             effective_config.grouping.minimum_confidence,
@@ -531,7 +662,7 @@ def run(
         try:
             for result_directory in completed:
                 try:
-                    group_extracted_atlas(result_directory, effective_config.grouping, semantic_backend)
+                    _group_extracted_atlas(result_directory, effective_config.grouping, semantic_backend)
                     console.print(f"[green]Agrupado:[/green] {result_directory}")
                 except (SemanticInferenceError, SemanticModelUnavailableError, OSError, ValueError) as error:
                     failures += 1
@@ -542,13 +673,22 @@ def run(
             semantic_backend.close()
     if failures:
         raise typer.Exit(code=1)
-    if zip_path:
+    if zip_path is not None:
         try:
             write_zip(zip_path, completed)
             console.print(f"[green]ZIP creado:[/green] {zip_path}")
         except OSError as error:
             console.print(f"[red]No se pudo crear el ZIP: {error}[/red]")
             raise typer.Exit(code=1) from error
+    elif effective_config.output.create_zip and not no_zip:
+        for result in completed:
+            destination = output_root / f"{result.name}-atlas-splitter.zip"
+            try:
+                write_zip(destination, [result])
+                console.print(f"[green]ZIP creado:[/green] {destination}")
+            except OSError as error:
+                console.print(f"[red]No se pudo crear el ZIP: {error}[/red]")
+                raise typer.Exit(code=1) from error
 
 
 @app.command()
@@ -563,8 +703,24 @@ def split(
 def translate_simple_args(arguments: list[str]) -> list[str]:
     """Traduce ``atlas-splitter archivo [salida]`` a la interfaz avanzada."""
     commands = {
-        "apply-review", "doctor", "extract", "glb", "group", "install", "inspect", "models", "preview",
-        "review", "semantic", "semantic-3d", "semantic-models", "run", "split",
+        "advanced",
+        "apply-review",
+        "doctor",
+        "extract",
+        "glb",
+        "group",
+        "group-3d",
+        "install",
+        "inspect",
+        "models",
+        "preview",
+        "review",
+        "semantic",
+        "semantic-3d",
+        "semantic-models",
+        "run",
+        "setup",
+        "split",
     }
     if not arguments or arguments[0] in commands or arguments[0].startswith("-"):
         return arguments
@@ -597,31 +753,16 @@ def main() -> None:
         raise SystemExit(1) from error
 
 
-@app.command()
+@app.command(hidden=True)
 def install(
-    model: Annotated[str | None, typer.Option(help="Checkpoint SAM 2 opcional")] = None,
-    environment: Annotated[Path, typer.Option(help="Ruta del virtualenv aislado")] = Path(".atlas-splitter-venv"),
-    profile: Annotated[str, typer.Option(help="basic, geometry, semantic o all")] = "basic",
-    yes: Annotated[bool, typer.Option("--yes", help="Confirma una descarga de modelo solicitada")] = False,
+    component: Annotated[str | None, typer.Argument(help="geometry, ai o all", show_default=False)] = None,
+    yes: Annotated[bool, typer.Option("--yes", help="Confirma las descargas de dependencias")] = False,
 ) -> None:
-    """Crea un entorno aislado local; no modifica el Python global."""
-    console.print("Creando entorno aislado de atlas-splitter...")
-    try:
-        target = create_isolated_environment(Path.cwd(), environment, profile)
-        if model is not None:
-            if not yes and not typer.confirm(
-                f"Esto descargará SAM 2 y el checkpoint '{model}' dentro del entorno aislado. ¿Continuar?",
-                default=False,
-            ):
-                raise InstallationError("Descarga de modelo cancelada por la persona usuaria.")
-            python = target / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
-            checkpoint = install_runtime(model, python)
-            console.print(f"[green]Checkpoint disponible:[/green] {checkpoint}")
-    except (InstallationError, OSError, ValueError) as error:
-        raise typer.BadParameter(str(error), param_hint="--environment") from error
-    executable = target / ("Scripts" if sys.platform == "win32" else "bin") / "atlas-splitter"
-    console.print(f"[green]Entorno listo:[/green] {target.resolve()}")
-    console.print(f"Ejecutable: {executable}")
+    """Alias temporal deprecado de ``setup``."""
+    console.print(
+        "[yellow]El comando `install` será retirado en una versión futura.\nUsa `atlas-splitter setup`.[/yellow]"
+    )
+    setup(component=component, yes=yes)
 
 
 @models_app.command("list")

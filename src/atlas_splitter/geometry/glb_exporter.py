@@ -7,7 +7,7 @@ import hashlib
 import logging
 from dataclasses import replace
 from pathlib import Path
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 import numpy as np
 from PIL import Image
@@ -67,7 +67,9 @@ def export_glb(
         if node_indices is not None and primitive.reference.node_index not in node_indices:
             continue
         binding = _primary_binding(loaded, primitive.reference.material_index, texture_slot, texture_index, image_index)
-        manual_atlas = selected_atlas is not None and (force_external_atlas or (binding is None and allow_unbound_atlas))
+        manual_atlas = selected_atlas is not None and (
+            force_external_atlas or (binding is None and allow_unbound_atlas)
+        )
         if manual_atlas:
             binding = TextureBinding(
                 slot=cast("TextureSlot", texture_slot),
@@ -99,7 +101,9 @@ def export_glb(
             triangles = primitive.triangle_indices[triangle_rows]
             transformed = _flip_v(binding.transform.apply(uvs)) if flip_v else binding.transform.apply(uvs)
             source_image = override or read_texture_image(loaded, binding.image_index)
-            region = rasterize_uv_triangles(transformed, triangles, source_image.width, source_image.height, binding.wrap_s, binding.wrap_t)
+            region = rasterize_uv_triangles(
+                transformed, triangles, source_image.width, source_image.height, binding.wrap_s, binding.wrap_t
+            )
             key = f"{group_by}-{group_index}"
             element = _element(
                 loaded, primitive, binding, key, uvs, transformed, triangles, triangle_rows, region, group_by
@@ -112,9 +116,7 @@ def export_glb(
                 else export_material_crops(
                     element_dir,
                     loaded,
-                    material_texture_bindings(loaded, material_index)
-                    if material_index is not None
-                    else [],
+                    material_texture_bindings(loaded, material_index) if material_index is not None else [],
                     uvs,
                     triangles,
                     image_overrides={binding.image_index: override} if override else None,
@@ -141,22 +143,27 @@ def export_glb(
         raise GltfLoadError("No se exportó ninguna región: no hay asociaciones material/textura/UV compatibles.")
     first_image = _image_for_dimensions(loaded, elements[0].image_index, selected_atlas)
     manifest = UvManifest(
-        source_file=str(loaded.source_path), capabilities=AtlasCapabilities.geometry_guided(),
-        atlas_width=first_image.width, atlas_height=first_image.height, elements=elements,
+        source_file=str(loaded.source_path),
+        capabilities=AtlasCapabilities.geometry_guided(),
+        atlas_width=first_image.width,
+        atlas_height=first_image.height,
+        elements=elements,
         warnings=[
             "Los recortes preservan la máscara UV; revise materiales con UV repetidas o transformaciones complejas.",
-            "El atlas se asoció manualmente porque el GLB no declara materiales."
-            if allow_unbound_atlas
-            else "",
+            "El atlas se asoció manualmente porque el GLB no declara materiales." if allow_unbound_atlas else "",
             "La coordenada V se invirtió por la convención confirmada del atlas externo." if flip_v else "",
         ],
     )
     write_versioned_manifest(destination / "uv_manifest.json", manifest)
     write_versioned_manifest(
         destination / "scene_manifest.json",
-        SceneManifest(source_file=str(loaded.source_path), capabilities=AtlasCapabilities.geometry_guided(), elements=elements),
+        SceneManifest(
+            source_file=str(loaded.source_path), capabilities=AtlasCapabilities.geometry_guided(), elements=elements
+        ),
     )
-    write_rebuild_script(destination / "blender" / "rebuild_scene.py", loaded.source_path, destination / "uv_manifest.json")
+    write_rebuild_script(
+        destination / "blender" / "rebuild_scene.py", loaded.source_path, destination / "uv_manifest.json"
+    )
     LOGGER.info("Exportadas %s regiones UV en %s", len(elements), destination)
     return manifest
 
@@ -307,7 +314,9 @@ def _verified_external_atlas(atlas: Path, loaded: LoadedGltf, binding: TextureBi
         raise GltfLoadError(
             f"El atlas externo no coincide con la imagen {binding.image_index} declarada por el material; no se asoció por nombre."
         )
-    LOGGER.info("Atlas externo verificado contra imagen material %s (textura %s).", binding.image_index, binding.texture_index)
+    LOGGER.info(
+        "Atlas externo verificado contra imagen material %s (textura %s).", binding.image_index, binding.texture_index
+    )
     return external
 
 
@@ -348,25 +357,63 @@ def _groups(triangles: np.ndarray, group_by: GroupBy, uvs: np.ndarray, uv_tolera
     )
 
 
-def _element(loaded, primitive, binding, key, uvs, transformed, triangles, triangle_rows, region, group_by) -> AtlasElement:  # type: ignore[no-untyped-def]
+def _element(
+    loaded: Any,
+    primitive: Any,
+    binding: Any,
+    key: str,
+    uvs: np.ndarray,
+    transformed: np.ndarray,
+    triangles: np.ndarray,
+    triangle_rows: np.ndarray,
+    region: Any,
+    group_by: GroupBy,
+) -> AtlasElement:
     from atlas_splitter.domain import slugify, stable_element_id
 
     ref = primitive.reference
     node_name = primitive.node_path[-1] if primitive.node_path else f"node_{ref.node_index}"
     material = loaded.document.materials[ref.material_index] if ref.material_index is not None else None
-    islands = [UvIsland(island_id=key, bounding_box=BoundingBox(x=region.bounding_box[0], y=region.bounding_box[1], width=region.bounding_box[2], height=region.bounding_box[3]), triangle_indices=[int(value) for value in triangle_rows])]
+    islands = [
+        UvIsland(
+            island_id=key,
+            bounding_box=BoundingBox(
+                x=region.bounding_box[0],
+                y=region.bounding_box[1],
+                width=region.bounding_box[2],
+                height=region.bounding_box[3],
+            ),
+            triangle_indices=[int(value) for value in triangle_rows],
+        )
+    ]
     return AtlasElement(
         element_id=stable_element_id(0, ref.node_index, ref.mesh_index, ref.primitive_index, key),
-        original_name=node_name, slug=slugify(f"{node_name}-{key}"), scene_index=0, node_index=ref.node_index,
-        node_path=list(primitive.node_path), mesh_index=ref.mesh_index, primitive_index=ref.primitive_index,
-        material_index=ref.material_index, material_name=getattr(material, "name", None), texture_slot=binding.slot,
+        original_name=node_name,
+        slug=slugify(f"{node_name}-{key}"),
+        scene_index=0,
+        node_index=ref.node_index,
+        node_path=list(primitive.node_path),
+        mesh_index=ref.mesh_index,
+        primitive_index=ref.primitive_index,
+        material_index=ref.material_index,
+        material_name=getattr(material, "name", None),
+        texture_slot=binding.slot,
         image_index=binding.image_index if binding.image_index >= 0 else None,
         texture_index=binding.texture_index if binding.texture_index >= 0 else None,
         texcoord=binding.texcoord,
-        original_uvs=uvs.tolist(), transformed_uvs=transformed.tolist(), triangle_indices=triangles.tolist(),
+        original_uvs=uvs.tolist(),
+        transformed_uvs=transformed.tolist(),
+        triangle_indices=triangles.tolist(),
         pixel_polygons=[[list(point) for point in polygon] for polygon in region.pixel_polygons],
-        bounding_box=BoundingBox(x=region.bounding_box[0], y=region.bounding_box[1], width=region.bounding_box[2], height=region.bounding_box[3]),
-        uv_islands=islands, group_by=group_by, node_transform=primitive.node_transform.reshape(-1).tolist(),
+        bounding_box=BoundingBox(
+            x=region.bounding_box[0],
+            y=region.bounding_box[1],
+            width=region.bounding_box[2],
+            height=region.bounding_box[3],
+        ),
+        uv_islands=islands,
+        group_by=group_by,
+        node_transform=primitive.node_transform.reshape(-1).tolist(),
         source_primitives=[
             {
                 "node_index": ref.node_index,

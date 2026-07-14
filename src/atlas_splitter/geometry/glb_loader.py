@@ -10,9 +10,7 @@ from pygltflib import GLTF2  # type: ignore[import-untyped]
 
 from atlas_splitter.exceptions import GltfLoadError
 
-_UNSUPPORTED_COMPRESSED_EXTENSIONS = frozenset(
-    {"EXT_meshopt_compression", "KHR_texture_basisu"}
-)
+_UNSUPPORTED_COMPRESSED_EXTENSIONS = frozenset({"EXT_meshopt_compression", "KHR_texture_basisu"})
 
 
 @dataclass(frozen=True)

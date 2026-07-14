@@ -32,9 +32,7 @@ def resolve_device(requested_device: str) -> DeviceResolution:
     disponibles; sólo ``auto`` puede degradarse a CPU.
     """
     if requested_device not in {"auto", "cpu", "cuda", "mps"}:
-        raise DeviceResolutionError(
-            f"Dispositivo no compatible: {requested_device}. Use auto, cpu, cuda o mps."
-        )
+        raise DeviceResolutionError(f"Dispositivo no compatible: {requested_device}. Use auto, cpu, cuda o mps.")
     requested = cast(RequestedDevice, requested_device)
     if requested == "cpu":
         return _report(DeviceResolution(requested, "cpu", False, "CPU fue solicitada explícitamente."))
@@ -60,9 +58,7 @@ def resolve_device(requested_device: str) -> DeviceResolution:
         return _report(DeviceResolution(requested, "cuda", False, "CUDA está disponible."))
     if mps_available:
         return _report(DeviceResolution(requested, "mps", False, "CUDA no está disponible; MPS está disponible."))
-    return _report(
-        DeviceResolution(requested, "cpu", True, "CUDA y MPS no están disponibles; se usará CPU.")
-    )
+    return _report(DeviceResolution(requested, "cpu", True, "CUDA y MPS no están disponibles; se usará CPU."))
 
 
 def _load_torch() -> object | None:
