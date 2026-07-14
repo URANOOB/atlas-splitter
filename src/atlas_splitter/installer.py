@@ -20,9 +20,15 @@ def create_isolated_environment(
     project_root: Path, environment: Path | None = None, profile: str = "basic"
 ) -> Path:
     """Instala atlas-splitter y sus extras en un virtualenv local multiplataforma."""
-    extras = {"basic": ".", "geometry": ".[geometry]", "semantic": ".[semantic]", "all": ".[vision,semantic,geometry]"}
+    extras = {
+        "basic": ".",
+        "geometry": ".[geometry]",
+        "vision": ".[vision]",
+        "semantic": ".[semantic]",
+        "all": ".[vision,semantic,geometry]",
+    }
     if profile not in extras:
-        raise InstallationError("Perfil no compatible. Use basic, geometry, semantic o all.")
+        raise InstallationError("Perfil no compatible. Use basic, geometry, vision, semantic o all.")
     target = environment or project_root / ".atlas-splitter-venv"
     try:
         if not target.exists():

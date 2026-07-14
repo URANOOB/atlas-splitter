@@ -70,6 +70,12 @@ atlas-splitter semantic-models list
 
 ## Instalación aislada
 
+También puede instalarse directamente desde GitHub con `pipx` (hasta que exista una publicación en PyPI):
+
+```text
+pipx install git+https://github.com/URANOOB/atlas-splitter.git
+```
+
 La forma recomendada crea el entorno y dependencias sin tocar el Python global:
 
 ```text
@@ -107,6 +113,10 @@ pip install -e ".[vision,semantic,geometry]"
 ```
 
 En macOS/Linux y Windows se usa el mismo ejecutable: `atlas-splitter`. Añade `atlas-splitter install --model sam2-small` sólo si deseas preparar también el runtime SAM 2 y su checkpoint.
+
+## Distribución Windows
+
+`scripts/build-windows-lite.ps1` produce dos ediciones locales con PyInstaller: `Lite` incluye inspección, UV, reportes y Blender; `AI` añade las dependencias de visión. Ninguna incluye modelos ni los descarga. `Lite` excluye PyTorch, Transformers y CUDA para reducir tamaño.
 
 ## Herramientas empleadas
 
