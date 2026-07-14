@@ -5,6 +5,13 @@ from atlas_splitter.cli import app, interactive_arguments, translate_simple_args
 runner = CliRunner()
 
 
+def _help(arguments: list[str]) -> str:
+    """Obtiene ayuda sin depender del ancho de terminal del runner CI."""
+    result = runner.invoke(app, arguments, terminal_width=200)
+    assert result.exit_code == 0
+    return result.stdout
+
+
 def test_models_list() -> None:
     result = runner.invoke(app, ["models", "list"])
     assert result.exit_code == 0
@@ -12,18 +19,15 @@ def test_models_list() -> None:
 
 
 def test_new_modes_expose_help() -> None:
-    assert runner.invoke(app, ["glb", "--help"]).exit_code == 0
-    assert runner.invoke(app, ["semantic", "--help"]).exit_code == 0
-    semantic_3d_help = runner.invoke(app, ["semantic-3d", "--help"])
-    assert semantic_3d_help.exit_code == 0
-    assert "--texture-index" in semantic_3d_help.stdout
-    assert "--uv-set" in semantic_3d_help.stdout
+    _help(["glb", "--help"])
+    _help(["semantic", "--help"])
+    semantic_3d_help = _help(["semantic-3d", "--help"])
+    assert "--texture-index" in semantic_3d_help
+    assert "--uv-set" in semantic_3d_help
 
 
 def test_debug_is_a_global_cli_option() -> None:
-    result = runner.invoke(app, ["--debug", "--help"])
-    assert result.exit_code == 0
-    assert "--debug" in result.stdout
+    assert "--debug" in _help(["--debug", "--help"])
 
 
 def test_glb_error_exposes_a_stable_code_without_traceback(tmp_path) -> None:
@@ -47,10 +51,9 @@ def test_run_rejects_a_missing_source(tmp_path) -> None:
 
 
 def test_run_help_exposes_expected_stage_one_options() -> None:
-    result = runner.invoke(app, ["run", "--help"])
-    assert result.exit_code == 0
-    assert "--device" in result.stdout
-    assert "--min-area" in result.stdout
+    help_text = _help(["run", "--help"])
+    assert "--device" in help_text
+    assert "--min-area" in help_text
 
 
 def test_cli_processes_a_webp(tmp_path) -> None:
@@ -108,11 +111,10 @@ def test_simple_command_keeps_glb_subcommand() -> None:
 
 
 def test_install_help_is_available_without_installing_dependencies() -> None:
-    result = runner.invoke(app, ["install", "--help"])
-    assert result.exit_code == 0
-    assert "virtualenv" in result.stdout
-    assert "--profile" in result.stdout
-    assert "--yes" in result.stdout
+    help_text = _help(["install", "--help"])
+    assert "virtualenv" in help_text
+    assert "--profile" in help_text
+    assert "--yes" in help_text
 
 
 def test_interactive_atlas_mode_returns_simple_reproducible_run_args(tmp_path, monkeypatch) -> None:
