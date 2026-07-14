@@ -9,12 +9,12 @@ from typing import Any, cast
 from PIL import Image
 
 from atlas_splitter.exceptions import SemanticInferenceError, SemanticModelUnavailableError
+from atlas_splitter.runtime import resolve_device
 from atlas_splitter.semantic.protocol import SemanticGroupingBackend
 from atlas_splitter.semantic.response_parser import SemanticResponseParseError, parse_response_json
 from atlas_splitter.semantic.types import GroupingContext, GroupingResult
 from atlas_splitter.semantic.validator import SemanticResponseValidationError, validate_groups
 from atlas_splitter.semantic_models.manager import is_semantic_model_downloaded, semantic_model_path
-from atlas_splitter.runtime import resolve_device
 
 LOGGER = logging.getLogger(__name__)
 
@@ -59,16 +59,14 @@ class Qwen3VLSemanticGroupingBackend(SemanticGroupingBackend):
         if selected == "cuda":
             dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
         try:
-            self._processor = AutoProcessor.from_pretrained(  # type: ignore[no-untyped-call]
-                model_path, local_files_only=True
-            )
+            self._processor = AutoProcessor.from_pretrained(model_path, local_files_only=True)
             self._model = AutoModelForImageTextToText.from_pretrained(
                 model_path,
                 local_files_only=True,
                 torch_dtype=dtype,
             )
-            self._model.to(selected)  # type: ignore[arg-type]
-            self._model.eval()  # type: ignore[no-untyped-call]
+            self._model.to(selected)
+            self._model.eval()
         except OSError as error:
             raise SemanticModelUnavailableError(f"No se pudo cargar el modelo local {model_path}: {error}") from error
         self._torch = torch

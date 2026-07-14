@@ -35,7 +35,11 @@ def test_semantic_output_routes_every_status_once(tmp_path: Path) -> None:
     assert (tmp_path / "uncertain" / "uncertain_001" / "element_002.png").is_file()
     assert (tmp_path / "unassigned" / "element_003.png").is_file()
     assert (tmp_path / "unassigned" / "element_004.png").is_file()
-    routed = list(tmp_path.glob("objects/**/*.png")) + list(tmp_path.glob("uncertain/**/*.png")) + list(tmp_path.glob("unassigned/*.png"))
+    routed = (
+        list(tmp_path.glob("objects/**/*.png"))
+        + list(tmp_path.glob("uncertain/**/*.png"))
+        + list(tmp_path.glob("unassigned/*.png"))
+    )
     assert sorted(path.name for path in routed) == [f"element_{index:03d}.png" for index in range(1, 5)]
     assert "rejected_001" not in artifacts
     assert pieces["E003"].png_path.is_file()

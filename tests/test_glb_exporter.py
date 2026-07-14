@@ -95,3 +95,52 @@ def test_exports_uvs_with_an_explicit_manual_atlas_when_glb_has_no_material(tmp_
 
 def test_flips_only_the_v_coordinate_for_confirmed_external_atlas() -> None:
     assert _flip_v(np.array([[0.25, 0.0], [0.75, 1.0]])).tolist() == [[0.25, 1.0], [0.75, 0.0]]
+
+
+def test_group_by_modes_produce_distinct_deterministic_element_counts(tmp_path: Path) -> None:
+    image_path = tmp_path / "paint.png"
+    Image.new("RGBA", (16, 16), (200, 20, 10, 255)).save(image_path)
+    positions = np.array([[0, 0, 0]] * 6, dtype="<f4").tobytes()
+    texcoords = np.array([[0, 0], [0.4, 0], [0, 0.4], [0.6, 0.6], [1, 0.6], [0.6, 1]], dtype="<f4").tobytes()
+    indices = np.arange(6, dtype="<u2").tobytes()
+    payload = positions + texcoords + indices
+    (tmp_path / "mesh.bin").write_bytes(payload)
+    model = tmp_path / "two-nodes.gltf"
+    model.write_text(
+        json.dumps(
+            {
+                "asset": {"version": "2.0"},
+                "buffers": [{"uri": "mesh.bin", "byteLength": len(payload)}],
+                "bufferViews": [
+                    {"buffer": 0, "byteOffset": 0, "byteLength": len(positions)},
+                    {"buffer": 0, "byteOffset": len(positions), "byteLength": len(texcoords)},
+                    {"buffer": 0, "byteOffset": len(positions) + len(texcoords), "byteLength": len(indices)},
+                ],
+                "accessors": [
+                    {"bufferView": 0, "componentType": 5126, "count": 6, "type": "VEC3"},
+                    {"bufferView": 1, "componentType": 5126, "count": 6, "type": "VEC2"},
+                    {"bufferView": 2, "componentType": 5123, "count": 6, "type": "SCALAR"},
+                ],
+                "images": [{"uri": "paint.png"}],
+                "textures": [{"source": 0}],
+                "materials": [{"pbrMetallicRoughness": {"baseColorTexture": {"index": 0}}}],
+                "meshes": [
+                    {
+                        "primitives": [
+                            {"attributes": {"POSITION": 0, "TEXCOORD_0": 1}, "indices": 2, "material": 0},
+                            {"attributes": {"POSITION": 0, "TEXCOORD_0": 1}, "indices": 2, "material": 0},
+                        ]
+                    }
+                ],
+                "nodes": [{"name": "one", "mesh": 0}, {"name": "two", "mesh": 0}],
+                "scenes": [{"nodes": [0, 1]}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    loaded = load_gltf(model)
+    counts = {
+        mode: len(export_glb(loaded, tmp_path / mode, group_by=mode).elements)
+        for mode in ("node", "mesh", "primitive", "uv-island")
+    }
+    assert counts == {"node": 2, "mesh": 1, "primitive": 4, "uv-island": 8}

@@ -25,7 +25,13 @@ def uv_island_triangle_groups(
     if coordinates is not None:
         if tolerance <= 0:
             raise PrimitiveDecodeError("La tolerancia UV debe ser mayor que cero.")
-        if coordinates.ndim != 2 or coordinates.shape[1] != 2 or np.any(indices < 0) or np.any(indices >= len(coordinates)):
+        invalid_coordinates = (
+            coordinates.ndim != 2
+            or coordinates.shape[1] != 2
+            or np.any(indices < 0)
+            or np.any(indices >= len(coordinates))
+        )
+        if invalid_coordinates:
             raise PrimitiveDecodeError("Las coordenadas UV deben ser VEC2 y cubrir todos los índices de triángulo.")
     owner_by_edge: dict[object, int] = {}
     parents = list(range(len(indices)))
@@ -44,6 +50,7 @@ def uv_island_triangle_groups(
     for triangle_index, triangle in enumerate(indices):
         vertices = [int(vertex) for vertex in triangle]
         for first, second in ((vertices[0], vertices[1]), (vertices[1], vertices[2]), (vertices[2], vertices[0])):
+            edge: object
             if coordinates is None:
                 edge = (first, second) if first < second else (second, first)
             else:

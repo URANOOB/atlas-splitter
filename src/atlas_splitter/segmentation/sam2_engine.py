@@ -57,7 +57,6 @@ class Sam2Engine:
     def _load_generator(self) -> object:
         if self._generator is not None:
             return self._generator
-        import torch
         from sam2.automatic_mask_generator import (  # type: ignore[import-not-found]
             SAM2AutomaticMaskGenerator,
         )

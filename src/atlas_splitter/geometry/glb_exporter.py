@@ -19,6 +19,7 @@ from atlas_splitter.domain import (
     SceneManifest,
     UvIsland,
     UvManifest,
+    slugify,
     stable_element_id,
     write_versioned_manifest,
 )
@@ -174,7 +175,9 @@ def _coalesce_elements(
             result.append(members[0].model_copy(update={"source_primitives": [_primitive_record(members[0])]}))
             continue
         first = members[0]
-        material_signature = {(item.material_index, item.image_index, item.texture_index, item.texcoord) for item in members}
+        material_signature = {
+            (item.material_index, item.image_index, item.texture_index, item.texcoord) for item in members
+        }
         if len(material_signature) != 1:
             raise GltfLoadError(
                 f"El grupo {group_by}={key} usa materiales o atlas distintos. Use --group-by primitive "
