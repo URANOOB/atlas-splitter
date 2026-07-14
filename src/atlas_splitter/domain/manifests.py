@@ -83,7 +83,38 @@ class ObjectManifest(_VersionedManifest):
     objects: list[ObjectGroup] = Field(default_factory=list)
 
 
-def write_versioned_manifest(destination: Path, manifest: SceneManifest | UvManifest | ObjectManifest) -> None:
+class ProjectAtlas(BaseModel):
+    """Un atlas exportado y la evidencia con que se lo asoció al modelo."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    atlas_id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{0,79}$")
+    source_file: str = Field(min_length=1)
+    output_directory: str = Field(min_length=1)
+    association_method: str = Field(min_length=1)
+    confidence: float = Field(ge=0.0, le=1.0)
+    manual_confirmation: bool
+    texture_slot: str = Field(min_length=1)
+    element_ids: list[str] = Field(default_factory=list)
+
+
+class ProjectManifest(BaseModel):
+    """Índice global versionado para resultados geométricos con varios atlas."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    schema_version: Literal["1.0"] = SCHEMA_VERSION
+    tool_version: str = Field(min_length=1)
+    created_at: str = Field(min_length=1)
+    source_files: list[str] = Field(min_length=1)
+    processing_mode: Literal["geometry_guided"] = "geometry_guided"
+    geometry_available: bool = True
+    semantic_backend: Literal["disabled"] = "disabled"
+    warnings: list[str] = Field(default_factory=list)
+    atlases: list[ProjectAtlas] = Field(default_factory=list)
+
+
+def write_versioned_manifest(
+    destination: Path, manifest: SceneManifest | UvManifest | ObjectManifest | ProjectManifest
+) -> None:
     """Escribe JSON canónico y atómico para no dejar resultados parciales."""
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = destination.with_suffix(destination.suffix + ".tmp")

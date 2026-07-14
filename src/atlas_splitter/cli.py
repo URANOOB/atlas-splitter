@@ -31,6 +31,7 @@ from atlas_splitter.geometry.glb_exporter import GroupBy, export_glb
 from atlas_splitter.geometry.glb_loader import load_gltf
 from atlas_splitter.geometry.model_inspector import inspect_model
 from atlas_splitter.geometry.object_grouping import ExportedAtlas, write_object_manifest
+from atlas_splitter.geometry.project_writer import write_project_manifest
 from atlas_splitter.geometry.texture_association import load_atlas_bindings, resolve_external_atlases
 from atlas_splitter.installer import InstallationError, create_isolated_environment, install_runtime
 from atlas_splitter.io.image_loader import ImageLoadError, discover_images
@@ -234,6 +235,7 @@ def glb(
             object_manifest = write_object_manifest(
                 output / "objects_manifest.json", loaded.source_path, exported_atlases
             )
+            write_project_manifest(output / "project.json", loaded.source_path, exported_atlases)
             write_object_rebuild_script(
                 output / "blender" / "rebuild_scene.py", loaded.source_path, output / "objects_manifest.json"
             )
