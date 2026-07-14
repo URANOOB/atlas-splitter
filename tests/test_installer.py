@@ -1,5 +1,6 @@
 """Contratos CPU de perfiles de instalación."""
 
+import os
 from pathlib import Path
 
 import pytest
@@ -17,7 +18,7 @@ def test_installation_accepts_the_visual_segmentation_profile(monkeypatch: pytes
     calls: list[list[str]] = []
     monkeypatch.setattr("atlas_splitter.installer.venv.EnvBuilder.create", lambda *_args: None)
     monkeypatch.setattr("atlas_splitter.installer.subprocess.run", lambda command, **_kwargs: calls.append(command))
-    python = tmp_path / "env" / "Scripts" / "python.exe"
+    python = tmp_path / "env" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
     python.parent.mkdir(parents=True)
     python.touch()
 
