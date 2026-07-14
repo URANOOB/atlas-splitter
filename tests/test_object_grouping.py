@@ -35,6 +35,9 @@ def test_groups_parts_by_node_and_preserves_atlas_reference(tmp_path: Path) -> N
         tmp_path / "room.glb",
         [ExportedAtlas(atlas, tmp_path / "first-house_day", manifest, flip_v=True)],
     )
+
+    assert result.objects[0].associations[0].method == "manual"
+    assert result.objects[0].associations[0].uv_set is None
     assert len(result.objects) == 1
     assert result.objects[0].node_name == "First_House_Baked"
     assert result.objects[0].flip_v is True

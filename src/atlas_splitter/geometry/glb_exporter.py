@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from dataclasses import replace
 from pathlib import Path
 from typing import Literal, cast
 
@@ -52,6 +53,8 @@ def export_glb(
     allow_unbound_atlas: bool = False,
     node_indices: set[int] | None = None,
     flip_v: bool = False,
+    uv_set: int | None = None,
+    force_external_atlas: bool = False,
 ) -> UvManifest:
     """Escribe máscaras UV, recortes, manifiestos y el script de reconstrucción."""
     primitives = decode_scene_primitives(loaded)
@@ -62,7 +65,7 @@ def export_glb(
         if node_indices is not None and primitive.reference.node_index not in node_indices:
             continue
         binding = _primary_binding(loaded, primitive.reference.material_index, texture_slot, texture_index)
-        manual_atlas = binding is None and selected_atlas is not None and allow_unbound_atlas
+        manual_atlas = selected_atlas is not None and (force_external_atlas or (binding is None and allow_unbound_atlas))
         if manual_atlas:
             binding = TextureBinding(
                 slot=cast("TextureSlot", texture_slot),
@@ -77,6 +80,8 @@ def export_glb(
         if binding is None:
             LOGGER.warning("Se omite %s: no hay textura %s asociada al material.", primitive.reference, texture_slot)
             continue
+        if uv_set is not None:
+            binding = replace(binding, texcoord=uv_set)
         override = (
             _verified_external_atlas(selected_atlas, loaded, binding)
             if selected_atlas and not manual_atlas

@@ -44,6 +44,23 @@ class ObjectTexturePart(BaseModel):
     exported_files: dict[str, str] = Field(default_factory=dict)
 
 
+class AtlasAssociationRecord(BaseModel):
+    """Evidencia auditable que enlaza un atlas externo con una parte glTF."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    method: str = Field(min_length=1, max_length=64)
+    confidence: float = Field(ge=0.0, le=1.0)
+    manual_confirmation: bool
+    atlas_path: str = Field(min_length=1)
+    node_index: int = Field(ge=0)
+    mesh_index: int | None = Field(default=None, ge=0)
+    material_index: int | None = Field(default=None, ge=0)
+    texture_index: int | None = Field(default=None, ge=0)
+    image_index: int | None = Field(default=None, ge=0)
+    uv_set: int | None = Field(default=None, ge=0)
+    flip_v: bool = False
+
+
 class ObjectGroup(BaseModel):
     """Objeto editable identificado por el nodo original de la escena."""
 
@@ -55,6 +72,7 @@ class ObjectGroup(BaseModel):
     atlas_path: str = Field(min_length=1)
     flip_v: bool = False
     parts: list[ObjectTexturePart] = Field(default_factory=list)
+    associations: list[AtlasAssociationRecord] = Field(default_factory=list)
 
 
 class ObjectManifest(_VersionedManifest):

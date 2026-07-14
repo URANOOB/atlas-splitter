@@ -28,7 +28,7 @@ from atlas_splitter.exceptions import (
 from atlas_splitter.geometry.glb_exporter import GroupBy, export_glb
 from atlas_splitter.geometry.glb_loader import load_gltf
 from atlas_splitter.geometry.object_grouping import ExportedAtlas, write_object_manifest
-from atlas_splitter.geometry.texture_association import associate_named_external_atlases
+from atlas_splitter.geometry.texture_association import load_atlas_bindings, resolve_external_atlases
 from atlas_splitter.installer import InstallationError, create_isolated_environment, install_runtime
 from atlas_splitter.io.image_loader import ImageLoadError, discover_images
 from atlas_splitter.io.zip_writer import write_zip
@@ -111,6 +111,7 @@ def glb(
     atlas_dir: Annotated[
         Path | None, typer.Option(help="Directorio de atlas WEBP asociados por nombre de nodo")
     ] = None,
+    bindings: Annotated[Path | None, typer.Option(help="YAML de bindings atlas/nodos confirmado manualmente")] = None,
     output: Annotated[Path, typer.Option(help="Directorio de resultados")] = Path("outputs"),
     texture_index: Annotated[int | None, typer.Option(help="Índice de textura a usar")] = None,
     texture_slot: Annotated[str, typer.Option(help="Mapa de material a extraer")] = "baseColor",
@@ -130,32 +131,42 @@ def glb(
         raise typer.BadParameter("--texture-slot no es válido")
     if atlas is not None and not atlas.is_file():
         raise typer.BadParameter("El atlas externo no existe", param_hint="--atlas")
-    if atlas is not None and atlas_dir is not None:
-        raise typer.BadParameter("Use --atlas o --atlas-dir, no ambos")
+    if sum(value is not None for value in (atlas, atlas_dir, bindings)) > 1:
+        raise typer.BadParameter("Use solo uno de --atlas, --atlas-dir o --bindings")
+    if bindings is not None and not bindings.is_file():
+        raise typer.BadParameter("El YAML de bindings no existe", param_hint="--bindings")
     try:
         loaded = load_gltf(model)
-        if atlas_dir is not None:
-            if not allow_unbound_atlas:
-                raise typer.BadParameter("--atlas-dir requiere --allow-unbound-atlas")
-            associations = associate_named_external_atlases(loaded, atlas_dir)
+        if atlas_dir is not None or bindings is not None:
+            associations = (
+                load_atlas_bindings(bindings, loaded)
+                if bindings is not None
+                else resolve_external_atlases(loaded, _required_atlas_directory(atlas_dir))
+            )
             exported_atlases = [
                 ExportedAtlas(
-                    atlas_path=atlas_path,
-                    output_directory=output / atlas_path.stem,
+                    atlas_path=association.atlas_path,
+                    output_directory=output / association.atlas_path.stem,
                     manifest=export_glb(
                         loaded,
-                        output / atlas_path.stem,
-                        atlas=atlas_path,
+                        output / association.atlas_path.stem,
+                        atlas=association.atlas_path,
                         texture_index=texture_index,
                         texture_slot=texture_slot,
                         group_by=cast(GroupBy, group_by),
-                        allow_unbound_atlas=True,
-                        node_indices=node_indices,
-                        flip_v=flip_v,
+                        allow_unbound_atlas=allow_unbound_atlas or association.manual_confirmation,
+                        node_indices=set(association.node_indices),
+                        flip_v=association.flip_v if bindings is not None else flip_v,
+                        uv_set=association.uv_set,
+                        force_external_atlas=association.manual_confirmation,
                     ),
-                    flip_v=flip_v,
+                    flip_v=association.flip_v if bindings is not None else flip_v,
+                    association_method=association.method,
+                    association_confidence=association.confidence,
+                    manual_confirmation=association.manual_confirmation,
+                    uv_set=association.uv_set,
                 )
-                for atlas_path, node_indices in associations.items()
+                for association in associations
             ]
             object_manifest = write_object_manifest(
                 output / "objects_manifest.json", loaded.source_path, exported_atlases
@@ -202,6 +213,13 @@ def glb(
     console.print(
         f"[cyan]Salida:[/cyan] {output.resolve()}; manifiesto=uv_manifest.json; Blender=blender/rebuild_scene.py"
     )
+
+
+def _required_atlas_directory(value: Path | None) -> Path:
+    """Estrecha el tipo tras validar el modo de asociacion del comando GLB."""
+    if value is None:
+        raise ValueError("Se requiere un directorio de atlas para la asociacion automatica.")
+    return value
 
 
 @app.command()
