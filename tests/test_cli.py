@@ -34,6 +34,13 @@ def test_glb_error_exposes_a_stable_code_without_traceback(tmp_path) -> None:
     assert "Traceback" not in result.stderr
 
 
+def test_glb_option_validation_uses_a_stable_cli_code(tmp_path) -> None:
+    result = runner.invoke(app, ["glb", str(tmp_path / "model.gltf"), "--group-by", "invalid"])
+    assert result.exit_code != 0
+    assert "AS-CLI-004" in result.stderr
+    assert "Solucion:" in result.stderr
+
+
 def test_run_rejects_a_missing_source(tmp_path) -> None:
     result = runner.invoke(app, ["run", str(tmp_path / "atlas.webp")])
     assert result.exit_code != 0

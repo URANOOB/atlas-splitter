@@ -19,6 +19,14 @@ class StageNotAvailableError(AtlasSplitterError):
     """Funcionalidad reservada para una etapa posterior."""
 
 
+class InputValidationError(AtlasSplitterError):
+    """Una ruta u opcion de la interfaz de linea de comandos no es valida."""
+
+    code = "AS-CLI-004"
+    probable_cause = "Una opcion o ruta no cumple el formato requerido por el comando."
+    solution = "Consulta --help, corrige el valor indicado y vuelve a ejecutar el comando."
+
+
 class ModelUnavailableError(AtlasSplitterError):
     """El modelo solicitado no esta instalado o no tiene checkpoint local."""
 

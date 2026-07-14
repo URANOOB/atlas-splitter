@@ -22,6 +22,7 @@ from atlas_splitter.domain import slugify
 from atlas_splitter.exceptions import (
     AtlasSplitterError,
     GltfLoadError,
+    InputValidationError,
     PrimitiveDecodeError,
     SemanticInferenceError,
     SemanticModelUnavailableError,
@@ -182,15 +183,15 @@ def glb(
 ) -> None:
     """Exporta regiones UV y materiales de un GLB/glTF enteramente local."""
     if group_by not in {"node", "mesh", "primitive", "uv-island"}:
-        raise typer.BadParameter("--group-by debe ser node, mesh, primitive o uv-island")
+        raise typer.BadParameter(str(InputValidationError("--group-by debe ser node, mesh, primitive o uv-island")))
     if texture_slot not in {"baseColor", "normal", "metallicRoughness", "occlusion", "emissive"}:
         raise typer.BadParameter("--texture-slot no es válido")
     if atlas is not None and not atlas.is_file():
-        raise typer.BadParameter("El atlas externo no existe", param_hint="--atlas")
+        raise typer.BadParameter(str(InputValidationError("El atlas externo no existe")), param_hint="--atlas")
     if sum(value is not None for value in (atlas, atlas_dir, bindings)) > 1:
-        raise typer.BadParameter("Use solo uno de --atlas, --atlas-dir o --bindings")
+        raise typer.BadParameter(str(InputValidationError("Use solo uno de --atlas, --atlas-dir o --bindings")))
     if bindings is not None and not bindings.is_file():
-        raise typer.BadParameter("El YAML de bindings no existe", param_hint="--bindings")
+        raise typer.BadParameter(str(InputValidationError("El YAML de bindings no existe")), param_hint="--bindings")
     try:
         loaded = load_gltf(model)
         if atlas_dir is not None or bindings is not None:
