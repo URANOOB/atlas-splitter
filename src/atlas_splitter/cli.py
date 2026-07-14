@@ -92,8 +92,14 @@ def doctor() -> None:
     table.add_column("Estado")
     table.add_column("Detalle")
     for check in checks:
-        table.add_row(check.name, "OK" if check.ok else "FALTA", check.detail)
+        style = "green" if check.ok else "yellow" if not check.critical else "red"
+        table.add_row(check.name, f"[{style}]{check.status}[/{style}]", check.detail)
     console.print(table)
+    ready = {check.name for check in checks if check.ok}
+    console.print("\n[bold]Tu equipo está listo para:[/bold]")
+    console.print(f"{'✓' if 'Geometría glTF' in ready else '✗'} Extraer atlas con GLB y UV")
+    console.print(f"{'✓' if 'OpenCV' in ready else '✗'} Separar atlas con procesamiento clásico")
+    console.print(f"{'✓' if 'Qwen3-VL local' in ready else '✗'} Usar Qwen3-VL local")
     if has_critical_failures(checks):
         raise typer.Exit(code=1)
 

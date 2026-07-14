@@ -1,4 +1,6 @@
-# atlas-splitter
+# Atlas Splitter
+
+> Convierte atlas de texturas en piezas editables mediante segmentación 2D o coordenadas UV exactas de GLB/glTF. Todo el procesamiento es local.
 
 CLI local y multiplataforma para convertir atlas de texturas en artefactos editables. Funciona en PowerShell, CMD, bash y terminales de macOS/Linux. Los archivos de entrada se procesan localmente.
 
@@ -9,6 +11,8 @@ Después de instalar, ejecuta simplemente:
 ```text
 atlas-splitter
 ```
+
+Consulta las guías de [inicio rápido](docs/quick-start.md), [instalación en Windows](docs/windows-installation.md), [GLB y UV](docs/glb-and-uv-workflow.md) y [solución de problemas](docs/troubleshooting.md).
 
 El asistente pregunta si tienes un GLB/glTF o sólo atlas WEBP, pide las rutas de entrada y salida, y crea `atlas-splitter.yaml` editable para el modo sin geometría.
 
@@ -60,6 +64,16 @@ La forma recomendada crea el entorno y dependencias sin tocar el Python global:
 
 ```text
 atlas-splitter install
+```
+
+También puedes crear un entorno del proyecto sin tocar Python global:
+
+```powershell
+.\scripts\install.ps1 -Features geometry
+```
+
+```bash
+./scripts/install.sh geometry
 ```
 
 También puede hacerse manualmente:

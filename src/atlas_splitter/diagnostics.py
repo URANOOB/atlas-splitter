@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import platform
+import shutil
 import sys
 import zipfile
 from collections.abc import Callable
@@ -20,6 +21,13 @@ class DiagnosticCheck:
     ok: bool
     detail: str
     critical: bool = False
+
+    @property
+    def status(self) -> str:
+        """Etiqueta apta para una interfaz de usuario no técnica."""
+        if self.ok:
+            return "LISTO"
+        return "REQUIERE ATENCIÓN" if self.critical else "OPCIONAL"
 
 
 def _module_version(module_name: str) -> str | None:
@@ -103,12 +111,27 @@ def collect_diagnostics(
         checks.append(DiagnosticCheck("PyTorch", True, torch_version, critical=True))
         checks.append(DiagnosticCheck("CUDA", cuda_available, cuda_detail))
     checks.append(_check_pillow_webp(module_version))
-    for label, module in (("OpenCV", "cv2"),):
+    for label, module in (("OpenCV", "cv2"), ("Geometría glTF", "pygltflib")):
         version = module_version(module)
         checks.append(DiagnosticCheck(label, version is not None, version or "no instalado"))
     checkpoint_root = checkpoint_dir or Path.home() / ".cache" / "atlas-splitter" / "checkpoints"
     has_checkpoint = checkpoint_root.exists() and any(checkpoint_root.glob("*.pt"))
     checks.append(DiagnosticCheck("Checkpoint SAM 2", has_checkpoint, str(checkpoint_root)))
+    semantic_root = Path.home() / ".cache" / "atlas-splitter" / "semantic-models"
+    has_semantic_model = semantic_root.is_dir() and any(semantic_root.glob("*/config.json"))
+    checks.append(DiagnosticCheck("Qwen3-VL local", has_semantic_model, str(semantic_root)))
+    checks.append(
+        DiagnosticCheck(
+            "Blender",
+            shutil.which("blender") is not None,
+            shutil.which("blender") or "no encontrado en PATH",
+        )
+    )
+    try:
+        free = shutil.disk_usage(Path.cwd()).free // 2**30
+        checks.append(DiagnosticCheck("Espacio libre", free >= 2, f"{free} GiB libres en la unidad de trabajo"))
+    except OSError as error:
+        checks.append(DiagnosticCheck("Espacio libre", False, str(error)))
     checks.append(_check_psd())
     checks.append(_check_zip())
     return checks
