@@ -27,8 +27,14 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e '.[dev,geometry]'
       - name: Test without models or GPU
-        run: python -m pytest
+        run: python -m pytest --cov=atlas_splitter --cov-report=xml:coverage.xml --cov-report=term-missing
       - name: Ruff
         run: python -m ruff check .
       - name: MyPy
         run: python -m mypy
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.os }}-py${{ matrix.python }}
+          path: coverage.xml
+          if-no-files-found: error
