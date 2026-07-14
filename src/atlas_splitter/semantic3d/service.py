@@ -16,7 +16,6 @@ from atlas_splitter.blender.script_writer import write_semantic_objects_rebuild_
 from atlas_splitter.exceptions import GltfLoadError
 from atlas_splitter.geometry.glb_loader import load_gltf
 from atlas_splitter.geometry.primitive_decoder import decode_scene_primitives
-from atlas_splitter.geometry.texture_association import associate_named_external_atlases
 from atlas_splitter.geometry.types import DecodedPrimitive
 from atlas_splitter.geometry.uv_rasterizer import rasterize_uv_triangles
 from atlas_splitter.reporting.semantic_contact_sheet import write_semantic_contact_sheet
@@ -55,17 +54,46 @@ def group_first_house(
     No modifica el GLB ni une geometría: sólo registra componentes y genera un
     script Blender que los separa de nuevo como objetos editables.
     """
+    return group_semantic_3d(model_path, atlas_path, output_root, backend, config, node_name=_NODE_NAME)
+
+
+def group_semantic_3d(
+    model_path: Path,
+    atlas_path: Path,
+    output_root: Path,
+    backend: GroupingBackend,
+    config: Semantic3DConfig | None = None,
+    *,
+    node_name: str | None = None,
+    node_index: int | None = None,
+    mesh_index: int | None = None,
+) -> Path:
+    """Agrupa un nodo UV explícito sin depender de nombres de ejemplo.
+
+    Si hay más de un candidato, exige ``--node`` o ``--mesh-index``; el atlas
+    suministrado por la persona usuaria se registra como una selección manual.
+    """
     effective_config = config or Semantic3DConfig()
     loaded = load_gltf(model_path)
-    named_associations = associate_named_external_atlases(loaded, atlas_path.parent)
-    associations = {path.resolve(): nodes for path, nodes in named_associations.items()}
-    if associations.get(atlas_path.resolve()) != {0}:
-        raise GltfLoadError("first-house_day.webp no está asociado exclusivamente a First_House_Baked.")
-    primitives = [
-        item for item in decode_scene_primitives(loaded) if item.node_path and item.node_path[-1] == _NODE_NAME
-    ]
-    if len(primitives) != 1 or 0 not in primitives[0].texcoords:
-        raise GltfLoadError("First_House_Baked debe contener exactamente una primitiva con UV0.")
+    if not atlas_path.is_file():
+        raise GltfLoadError(f"No existe el atlas local: {atlas_path}")
+    candidates = [item for item in decode_scene_primitives(loaded) if 0 in item.texcoords]
+    if node_index is not None:
+        candidates = [item for item in candidates if item.reference.node_index == node_index]
+    if mesh_index is not None:
+        candidates = [item for item in candidates if item.reference.mesh_index == mesh_index]
+    if node_name is not None:
+        candidates = [item for item in candidates if item.node_path and item.node_path[-1] == node_name]
+    node_ids = sorted({item.reference.node_index for item in candidates})
+    if not candidates:
+        raise GltfLoadError("No se encontró un nodo con TEXCOORD_0 que coincida con los selectores indicados.")
+    if len(node_ids) > 1:
+        raise GltfLoadError(
+            "Hay varios nodos con UV compatibles. Use --node o --mesh-index para seleccionar uno explícitamente."
+        )
+    if len(candidates) != 1:
+        raise GltfLoadError("El nodo seleccionado contiene varias primitivas; use --mesh-index para desambiguar.")
+    primitive = candidates[0]
     destination = output_root.resolve() / atlas_path.stem / "semantic_objects"
     if destination.exists():
         raise FileExistsError(f"La salida semántica ya existe y no se sobrescribirá: {destination}")
@@ -73,7 +101,7 @@ def group_first_house(
     try:
         with Image.open(atlas_path) as image:
             atlas = image.convert("RGBA")
-        components, _ = _write_components(destination, primitives[0], atlas, flip_v=effective_config.flip_v)
+        components, _ = _write_components(destination, primitive, atlas, flip_v=effective_config.flip_v)
         proximity_edges = _proximity_proposals(components, effective_config.proximity_factor)
         proposals, pieces = _write_proposals(destination, atlas, components, proximity_edges)
         sheet = destination / "contact_sheets" / "proposals.png"
@@ -98,6 +126,7 @@ def group_first_house(
             proximity_edges,
             effective_config,
             inference_error,
+            primitive,
         )
         _write_group_previews(destination, manifest, atlas)
         _write_json(destination / "semantic_objects_manifest.json", manifest)
@@ -281,6 +310,7 @@ def _manifest(
     proximity_edges: list[dict[str, object]],
     config: Semantic3DConfig,
     inference_error: str | None,
+    primitive: DecodedPrimitive | None = None,
 ) -> dict[str, object]:
     known = {str(item["proposal_id"]): item for item in proposals}
     groups: list[dict[str, object]] = []
@@ -303,10 +333,18 @@ def _manifest(
         )
     return {
         "schema_version": "1.0",
-        "phase": "first_house_semantic_3d",
+        "phase": "semantic_3d",
         "source_file": str(source.resolve()),
         "atlas_file": str(atlas.resolve()),
-        "node": {"name": _NODE_NAME, "node_index": 0, "uv_set": 0},
+        "node": {
+            "name": (
+                primitive.node_path[-1] if primitive is not None and primitive.node_path else _NODE_NAME
+            ),
+            "node_index": primitive.reference.node_index if primitive is not None else 0,
+            "mesh_index": primitive.reference.mesh_index if primitive is not None else None,
+            "uv_set": 0,
+            "association_method": "manual_explicit_atlas",
+        },
         "components": components,
         "proximity_objects": proposals,
         "groups": groups,

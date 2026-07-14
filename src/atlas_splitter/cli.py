@@ -39,7 +39,7 @@ from atlas_splitter.pipeline import process_image
 from atlas_splitter.segmentation.sam2_engine import Sam2Engine
 from atlas_splitter.semantic.grouping_service import group_extracted_atlas
 from atlas_splitter.semantic.qwen3_vl_engine import Qwen3VLSemanticGroupingBackend
-from atlas_splitter.semantic3d import Semantic3DConfig, group_first_house
+from atlas_splitter.semantic3d import Semantic3DConfig, group_semantic_3d
 from atlas_splitter.semantic_models.manager import download_semantic_model, is_semantic_model_downloaded
 from atlas_splitter.semantic_models.registry import SEMANTIC_MODELS, get_semantic_model
 
@@ -222,22 +222,32 @@ def semantic(
 
 @app.command("semantic-3d")
 def semantic_3d(
-    model: Annotated[Path, typer.Argument(help="Room.glb local")],
-    atlas: Annotated[Path, typer.Argument(help="Samples/day/first-house_day.webp local")],
+    model: Annotated[Path, typer.Argument(help="GLB/glTF local")],
+    atlas: Annotated[Path, typer.Argument(help="Atlas local confirmado por la persona usuaria")],
     output: Annotated[Path, typer.Option(help="Raíz de salida GLB")] = Path("outputs"),
     device: Annotated[str, typer.Option(help="auto, cpu o cuda para Qwen3-VL local")] = "cuda",
     minimum_confidence: Annotated[float, typer.Option(help="Confianza mínima para aceptar un grupo")] = 0.70,
+    node: Annotated[int | None, typer.Option(help="Índice del nodo glTF a analizar")] = None,
+    mesh_index: Annotated[int | None, typer.Option(help="Índice de malla para desambiguar")] = None,
+    flip_v: Annotated[bool, typer.Option(help="Invierte V para el atlas externo")] = True,
+    proximity_factor: Annotated[float, typer.Option(help="Distancia relativa para propuestas 3D")] = 0.08,
 ) -> None:
-    """Agrupa sólo First_House_Baked sin unir sus componentes de malla."""
-    if model.name != "Room.glb" or atlas.name != "first-house_day.webp":
-        raise typer.BadParameter("Esta primera fase sólo admite Room.glb y first-house_day.webp.")
+    """Agrupa un nodo GLB con UV sin unir físicamente sus componentes de malla."""
     if not model.is_file() or not atlas.is_file():
         raise typer.BadParameter("El GLB o atlas solicitado no existe localmente.")
     if not is_semantic_model_downloaded("qwen3-vl-2b"):
         raise typer.BadParameter("qwen3-vl-2b no está disponible localmente; no se descargará durante run.")
     backend = Qwen3VLSemanticGroupingBackend("qwen3-vl-2b", device, minimum_confidence, minimum_confidence)
     try:
-        destination = group_first_house(model, atlas, output, backend, Semantic3DConfig(minimum_confidence))
+        destination = group_semantic_3d(
+            model,
+            atlas,
+            output,
+            backend,
+            Semantic3DConfig(minimum_confidence, proximity_factor, flip_v),
+            node_index=node,
+            mesh_index=mesh_index,
+        )
     except (GltfLoadError, PrimitiveDecodeError, SemanticInferenceError, OSError, ValueError) as error:
         raise typer.BadParameter(str(error)) from error
     finally:
