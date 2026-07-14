@@ -184,10 +184,24 @@ def _coalesce_elements(
             (item.material_index, item.image_index, item.texture_index, item.texcoord) for item in members
         }
         if len(material_signature) != 1:
-            raise GltfLoadError(
-                f"El grupo {group_by}={key} usa materiales o atlas distintos. Use --group-by primitive "
-                "o seleccione una textura/material compatible."
-            )
+            # Un elemento UV representa un único material. Mezclarlos produciría
+            # una máscara aparentemente válida pero recortes y mapas auxiliares
+            # falsos. Conservamos por tanto cada primitiva/material dentro del
+            # mismo grupo lógico (node o mesh), con toda su procedencia.
+            for item in members:
+                result.append(
+                    item.model_copy(
+                        update={
+                            "source_primitives": [_primitive_record(item)],
+                            "warnings": [
+                                *item.warnings,
+                                f"El grupo {group_by}={key} usa varios materiales; esta región se conserva "
+                                "por material para no perder mapas auxiliares.",
+                            ],
+                        }
+                    )
+                )
+            continue
         mask, box = _combined_mask(destination, members)
         image = _external_image(atlas) if atlas is not None else read_texture_image(loaded, first.image_index or 0)
         x, y, width, height = box
