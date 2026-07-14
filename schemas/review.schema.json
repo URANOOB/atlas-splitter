@@ -1,12 +1,1 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Atlas Splitter review",
-  "type": "object",
-  "required": ["version", "groups", "unassigned_piece_ids"],
-  "properties": {
-    "version": {"const": 1},
-    "source": {"type": "string"},
-    "groups": {"type": "array"},
-    "unassigned_piece_ids": {"type": "array", "items": {"type": "string"}}
-  }
-}
+{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"Atlas Splitter review","type":"object","required":["version","groups","unassigned_piece_ids"],"properties":{"version":{"const":1},"source":{"type":"string"},"groups":{"type":"array","items":{"type":"object","required":["name","piece_ids"],"properties":{"name":{"type":"string","pattern":"^[a-z0-9][a-z0-9_-]{0,79}$"},"piece_ids":{"type":"array","items":{"type":"string","pattern":"^E[0-9]{3}$"}},"confidence":{"type":"number","minimum":0,"maximum":1},"status":{"enum":["accepted","uncertain"]}}}},"unassigned_piece_ids":{"type":"array","items":{"type":"string","pattern":"^E[0-9]{3}$"}}}}

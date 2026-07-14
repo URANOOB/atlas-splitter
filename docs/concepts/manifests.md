@@ -1,5 +1,9 @@
 # Manifiestos
 
-Un manifiesto es simplemente un archivo de texto en formato JSON que lleva un inventario estricto.
+Un manifiesto es un JSON que describe una salida sin guardar la imagen dentro del propio JSON. `manifest.json` enumera piezas, máscaras y el atlas copiado en `source/`.
 
-En Atlas Splitter, los manifiestos no son un subproducto, **son la base de datos principal** del resultado. Contienen el ID de cada pieza, sus coordenadas, rotación, y nombre semántico. Son consumidos por el visor HTML y por el add-on de Blender.
+Los manifiestos semánticos registran propuestas; `review.json` es el archivo diseñado para que una persona cambie grupos. Los manifiestos UV y de proyecto conservan evidencia de la asociación con un GLB.
+
+No cambies rutas de PNG o máscaras a mano: pueden dejar de estar confinadas al proyecto. Mueve el directorio completo y usa `preview` para regenerar el reporte.
+
+La [referencia de manifiestos](../reference/manifests.md) detalla quién genera y consume cada archivo.

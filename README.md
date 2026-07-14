@@ -1,80 +1,34 @@
 # Atlas Splitter
 
-![License](https://img.shields.io/badge/license-MIT-blue) ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue) ![Status](https://img.shields.io/badge/status-active-success)
+![Licencia MIT](https://img.shields.io/badge/licencia-MIT-blue) ![Python 3.11–3.13](https://img.shields.io/badge/Python-3.11--3.13-blue)
 
-Herramienta CLI local para separar regiones visuales de atlas de texturas 2D y recuperar coordenadas UV de archivos GLB/glTF.
+CLI local para separar atlas de texturas y extraer regiones UV de GLB/glTF.
 
-![Captura principal](https://raw.githubusercontent.com/URANOOB/atlas-splitter/main/docs/assets/screenshot.webp)
+![Atlas real de ejemplo](docs/assets/first-house-day-atlas.webp)
 
-## Flujos de trabajo
-
-| Tengo | Debo usar | Resultado |
+| Tengo | Uso | Resultado |
 | --- | --- | --- |
-| Sólo un atlas | `split` | Piezas visuales |
-| Atlas y GLB/glTF | `extract` | Regiones por UV |
-| Atlas y deseo nombres | `semantic` | Grupos inferidos |
-| Resultado a corregir | `review` | Revisión manual |
-| Proyecto para Blender | `blender-addon` | Scripts para Blender |
+| Sólo un atlas | `split` | Piezas visuales aproximadas |
+| Atlas y GLB/glTF | `extract` | Regiones guiadas por UV |
+| Atlas y deseo nombres | `semantic` | Grupos inferidos localmente |
 
 ## Instalación rápida
 
 ```text
 pipx install atlas-splitter
+atlas-splitter doctor
 ```
 
-Para soporte de geometría (GLB) e inteligencia artificial:
-```text
-atlas-splitter setup all
-```
-
-### Windows portable
-Si no puedes instalar Python, descarga el `.zip` ejecutable desde *Releases* y úsalo en cualquier PC sin conexión.
-
-## 3 Comandos básicos
-
-1. **Separar visualmente:**
-   ```text
-   atlas-splitter split atlas.webp --output resultados
-   ```
-
-2. **Extraer usando modelo 3D:**
-   ```text
-   atlas-splitter extract modelo.glb --atlas atlas.webp --output resultados
-   ```
-
-3. **Ver resultados interactivos:**
-   ```text
-   atlas-splitter preview resultados/atlas
-   ```
-
-## Resultado
-
-Al ejecutar cualquiera de los comandos anteriores, Atlas Splitter creará una carpeta con todas las subimágenes cortadas, un archivo manifiesto JSON detallando sus posiciones, y un reporte HTML interactivo para previsualizarlas localmente.
-
-## Blender
-
-Exporta el add-on oficial para importar automáticamente los archivos segmentados y reconstruir tu escena.
+## Tres comandos
 
 ```text
-atlas-splitter blender-addon export
+atlas-splitter split atlas.webp --output resultados
+atlas-splitter extract modelo.glb --atlas atlas.webp --output resultados
+atlas-splitter blender-addon export --output Descargas
 ```
 
-## Privacidad
+`split` genera PNG, máscaras, PSD opcionales y un reporte. `extract` no modifica el GLB. La versión portable para Windows se distribuye como ZIP en Releases.
 
-Todo el procesamiento, incluyendo modelos de IA complejos, se ejecuta de forma **100% local** en tu ordenador. Tus texturas y modelos 3D nunca abandonan tu máquina.
+Todo el procesamiento ocurre localmente. Los modelos opcionales se descargan sólo con una orden explícita. La segmentación visual y los nombres semánticos son aproximaciones: revisa las piezas antes de usarlas.
 
-## Limitaciones
-
-- Consumo elevado de memoria RAM para atlas superiores a 8K.
-- Soporte para GLB estandarizado sin compresión Draco.
-- La segmentación visual depende del canal de transparencia.
-
-## Documentación
-
-[Visita la documentación oficial](https://uranoob.github.io/atlas-splitter/) para guías detalladas, esquemas de JSON, y resolución de problemas comunes.
-
-## Estado
-Bajo desarrollo activo. Preparado para producción en flujos de trabajo de modificación de assets.
-
-## Licencia
-Distribuido bajo licencia MIT. Ver archivo `LICENSE`.
+La documentación completa está en [docs/](docs/index.md). Consulta [licencia](LICENSE) y [seguridad](SECURITY.md).

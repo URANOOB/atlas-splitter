@@ -1,117 +1,36 @@
 # Instalación
 
-Atlas Splitter se instala mejor usando `pipx` para mantener sus dependencias aisladas.
-
 ## Requisitos
 
-* **Python:** 3.11 a 3.13.
-* **Sistemas operativos:** Windows 10+, macOS 13+, Linux (Ubuntu 22.04+).
-* **Espacio en disco:** 500 MB mínimos. Si usas IA, 5-10 GB adicionales para modelos.
-* **GPU (Opcional):** Tarjeta gráfica compatible con CUDA (NVIDIA) o MPS (Apple Silicon) para acelerar operaciones de IA.
-* **Internet:** Sólo para la instalación y descarga de modelos (opcional).
+Usa Python 3.11, 3.12 o 3.13 en Windows, macOS o Linux. La instalación base necesita espacio para Python y sus dependencias; los componentes de IA añaden descargas locales. Una GPU es opcional: CUDA sirve en equipos NVIDIA y MPS en equipos Apple compatibles. Internet sólo se necesita para instalar paquetes o descargar modelos de forma explícita.
 
 ## Pipx
 
-Si no tienes `pipx`, instálalo primero.
+`pipx` instala el comando en un entorno aislado. Tras `pipx ensurepath`, cierra y abre la terminal.
 
-### Windows PowerShell
-
-Abre PowerShell y ejecuta:
 ```powershell
-pip install pipx
-pipx ensurepath
-```
-Cierra y vuelve a abrir PowerShell, luego:
-```text
-pipx install atlas-splitter
-```
-
-### Windows CMD
-
-Ejecuta en Símbolo del sistema:
-```cmd
-pip install pipx
+python -m pip install --user pipx
 python -m pipx ensurepath
-```
-Reinicia la consola e instala:
-```text
 pipx install atlas-splitter
 ```
 
-### Linux
+En CMD usa los mismos comandos `python -m`. En Linux instala `pipx` con el gestor de paquetes de tu distribución o `python -m pip install --user pipx`; en macOS puedes usar `brew install pipx`. Después ejecuta `pipx ensurepath`.
 
-```bash
-sudo apt update
-sudo apt install pipx
-pipx ensurepath
-```
-Reinicia la terminal e instala:
-```text
-pipx install atlas-splitter
-```
+## Wheel y desarrollo
 
-### macOS
-
-```bash
-brew install pipx
-pipx ensurepath
-```
-Reinicia la terminal e instala:
-```text
-pipx install atlas-splitter
-```
-
-## Wheel
-
-Si tienes un archivo release descargado, puedes instalarlo directamente:
 ```text
 pipx install atlas_splitter-0.2.0-py3-none-any.whl
-```
-
-## Desarrollo
-
-Para contribuir o instalar desde el código fuente:
-```text
 git clone https://github.com/URANOOB/atlas-splitter.git
 cd atlas-splitter
 python -m venv .venv
-# Activar entorno
-pip install -e ".[dev,geometry,docs]"
 ```
 
-## Componentes opcionales
+Activa `.venv` según tu shell y ejecuta `python -m pip install -e ".[dev,geometry,docs]"` para desarrollo.
 
-Instala soporte para geometría 3D y GLB:
-```text
-atlas-splitter setup geometry
-```
+## Componentes, actualización y comprobación
 
-Instala soporte para segmentación semántica e IA (PyTorch, Transformers):
-```text
-atlas-splitter setup ai
-```
+`atlas-splitter setup geometry` instala dependencias GLB/glTF. `setup ai` instala dependencias de IA, no modelos. `setup all` instala ambos grupos. Actualiza con `pipx upgrade atlas-splitter` y elimina el comando con `pipx uninstall atlas-splitter`; los modelos descargados permanecen en la caché local.
 
-Instala todo:
-```text
-atlas-splitter setup all
-```
-
-## Actualización y eliminación
-
-Para actualizar:
-```text
-pipx upgrade atlas-splitter
-```
-
-Para desinstalar:
-```text
-pipx uninstall atlas-splitter
-```
-*Nota: La desinstalación no elimina los modelos de IA descargados en caché.*
-
-## Verificación
-
-Asegúrate de que todo está correcto:
 ```text
 atlas-splitter --version
 atlas-splitter doctor

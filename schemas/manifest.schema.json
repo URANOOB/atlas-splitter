@@ -6,7 +6,10 @@
   "properties": {
     "schema_version": {"const": "1.0"},
     "tool_version": {"type": "string"},
-    "source_file": {"type": "string"},
-    "elements": {"type": "array", "items": {"type": "object", "required": ["png", "mask"]}}
+    "source_file": {"type": "string", "minLength": 1},
+    "source_file_portable": {"type": "boolean"},
+    "sha256": {"type": "string"},
+    "dimensions": {"type": "object", "required": ["width", "height", "channels"], "properties": {"width": {"type": "integer", "minimum": 1}, "height": {"type": "integer", "minimum": 1}, "channels": {"const": 4}}},
+    "elements": {"type": "array", "items": {"type": "object", "required": ["name", "bbox", "area", "png", "mask"], "properties": {"name": {"type": "string"}, "bbox": {"type": "object", "required": ["x", "y", "width", "height"]}, "area": {"type": "integer", "minimum": 0}, "confidence": {"type": "number"}, "stability": {"type": "number"}, "source": {"type": "string"}, "png": {"type": "string"}, "mask": {"type": "string"}, "psd": {"type": ["string", "null"]}}}}
   }
 }

@@ -1,95 +1,28 @@
 # Referencia de manifiestos
 
-## `manifest.json`
-* **Generado por:** `split`, `semantic`
-* **Consumido por:** `preview`, visor HTML
-* **Versión:** 1
-* **Campos principales:** `source_image`, `pieces` (lista de objetos con `id`, `bbox`, `path`)
-* **Editable:** No recomendado.
-* **Ejemplo:**
+Los manifiestos son JSON locales. Conserva sus rutas relativas y trata los recibidos de terceros como datos no confiables. Los esquemas de `schemas/` describen los contratos de los manifiestos versionados.
+
+| Archivo | Genera | Consume | ¿Editable? |
+| --- | --- | --- | --- |
+| `manifest.json` | `split` | `preview`, `group`, reporte | No, salvo migración consciente. |
+| `semantic_manifest.json` y `grouping_manifest.json` | `semantic` o `group` | reporte y revisión | No recomendado. |
+| `review.json` | `review` o flujo semántico | `apply-review` | Sí. |
+| `review_applied.json` | `apply-review` | auditoría | No. |
+| `uv_manifest.json` | `extract` | scripts Blender | No. |
+| `objects_manifest.json`, `project.json` | extracción multiatlas | add-on Blender | No recomendado. |
+
+## Manifest visual
+
+`manifest.json` usa `schema_version`, `tool_version`, `source_file`, `source_file_portable`, dimensiones, parámetros y `elements`. Cada elemento contiene nombre, cuadro `bbox`, área, confianza, origen y rutas relativas `png`, `mask` y opcionalmente `psd`.
+
 ```json
-{
-  "version": 1,
-  "source_image": "../atlas.png",
-  "pieces": [
-    {
-      "id": "obj_0000",
-      "bbox": [0, 0, 100, 100],
-      "path": "objects/obj_0000.png"
-    }
-  ]
-}
+{"schema_version":"1.0","source_file":"source/atlas.webp","source_file_portable":true,"elements":[{"name":"element_001","png":"png/element_001.png","mask":"masks/element_001.png"}]}
 ```
 
-## `semantic_manifest.json`
-* **Generado por:** `semantic`
-* **Consumido por:** `group`, visores avanzados
-* **Versión:** 1
-* **Campos principales:** `groups` (nombres y lista de IDs de piezas asignadas).
-* **Editable:** Usa `review.json` mejor.
-* **Ejemplo:**
+## Revisión manual
+
 ```json
-{
-  "version": 1,
-  "groups": {
-    "walls": ["obj_0000"]
-  }
-}
+{"version":1,"source":"semantic","groups":[{"name":"walls","piece_ids":["E001","E002"],"confidence":0.91,"status":"accepted"}],"unassigned_piece_ids":["E003"]}
 ```
 
-## `grouping_manifest.json`
-* **Generado por:** `group-3d`, `group`
-* **Consumido por:** `blender-addon`
-* **Versión:** 1
-* **Editable:** No recomendado.
-
-## `review.json`
-* **Generado por:** `semantic`, o comandos de revisión.
-* **Consumido por:** `apply-review`
-* **Versión:** 1
-* **Editable:** Sí.
-* **Ejemplo:**
-```json
-{
-  "version": 1,
-  "source": "semantic",
-  "groups": [
-    {
-      "name": "walls",
-      "piece_ids": ["E001"],
-      "confidence": 0.9,
-      "status": "accepted"
-    }
-  ],
-  "unassigned_piece_ids": []
-}
-```
-
-## `review_applied.json`
-* **Generado por:** `apply-review`
-* Copia del `review.json` una vez sus efectos ya alteraron la carpeta `grouped/`.
-
-## `uv_manifest.json`
-* **Generado por:** `extract`
-* **Consumido por:** Scripts de reconstrucción.
-* Contiene arrays mapeando vértices y UVs.
-
-## `objects_manifest.json`
-* **Generado por:** `extract`
-* Mapea mallas del GLB a las imágenes `obj_XXX.png`.
-
-## `project.json`
-* **Generado por:** `extract`
-* **Consumido por:** `blender-addon`
-* Punto de entrada principal que enlaza los demás manifiestos.
-* **Ejemplo:**
-```json
-{
-  "version": 1,
-  "type": "geometry",
-  "manifests": {
-    "uv": "uv_manifest.json",
-    "objects": "objects_manifest.json"
-  }
-}
-```
+Incluye cada ID exactamente una vez. Los manifiestos geométricos versionados usan `schema_version: "1.0"`; `project.json` añade versión de herramienta, fecha, archivos fuente y una lista de atlas con el método y confianza de asociación.

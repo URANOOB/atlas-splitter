@@ -1,35 +1,15 @@
 # Segmentación visual
 
-La segmentación visual procesa una imagen sin ninguna información 3D extra. Su propósito es recortar formas independientes.
+`split` observa los píxeles de un atlas WEBP; no conoce el modelo 3D. Busca regiones visibles, crea una máscara para cada una y exporta PNG y PSD según la configuración. Es una separación aproximada, no una reconstrucción 3D.
 
-## Qué analiza
-Busca "islas" de píxeles no transparentes. Todo lo que esté conectado por píxeles visibles se considera una sola pieza.
+![Atlas real empleado como ejemplo](../assets/first-house-day-atlas.webp)
 
-* **Transparencia:** Es el delimitador principal. Atlas Splitter detecta el canal alfa y divide donde el alfa es 0.
-* **Fondos:** Si tu imagen no tiene transparencia, la herramienta asume que es una sola pieza sólida. En esos casos, fallará en dividirla a menos que uses una herramienta externa primero para quitar el fondo.
-* **Regiones conectadas:** Píxeles diagonales se consideran conectados por defecto.
-* **Máscaras y recorte:** Las piezas finales se recortan para eliminar el espacio vacío a su alrededor.
-* **Padding:** Se añade un relleno transparente de seguridad alrededor del recorte.
-* **Área mínima:** Si una pieza generada tiene menos de 4 píxeles cuadrados, se ignora como "ruido".
-* **Deduplicación:** Las piezas idénticas a nivel de píxel se agrupan.
-* **SAM 2:** Opcionalmente, se puede utilizar el modelo SAM 2 para mejorar la separación.
-* **PSD:** Puede procesar capas individuales.
-
-## Ejemplos
-
-Comando principal:
 ```text
-atlas-splitter split atlas.webp
+atlas-splitter split atlas.webp --output resultados
 ```
 
-Comando avanzado especificando área mínima de 10 píxeles:
-```text
-atlas-splitter split atlas.webp --min-area 10
-```
+La transparencia ayuda: las zonas con alfa cero separan piezas. Un fondo opaco, dos piezas que se tocan, objetos superpuestos o detalles más pequeños que `min_area` pueden producir una sola pieza o descartar ruido. Las máscaras conservan la forma detectada; el recorte y `padding` dejan un margen alrededor del cuadro.
 
-## Errores comunes y situaciones donde fallará
-1. **Piezas del mismo color unidas:** Si dos piezas se tocan aunque sea por 1 píxel no transparente, serán exportadas como una sola imagen.
-2. **Fondos complejos:** Si la imagen tiene un fondo negro o blanco en lugar de alfa, no se podrá separar.
-3. **Objetos superpuestos:** No puede reconstruir información que está oculta detrás de otra pieza.
-4. **Detalles muy pequeños:** Si el área mínima es mayor que la pieza, ésta se descartará.
-5. **Ausencia de transparencia:** Todo el archivo será 1 sola pieza.
+Para ajustar área mínima, deduplicación, recorte o PSD, crea YAML con `atlas-splitter config init atlas-splitter.yml` y usa el flujo avanzado de compatibilidad sólo si necesitas opciones no expuestas por `split`. SAM 2 es opcional y nunca se descarga durante una ejecución.
+
+Comprueba `manifest.json`, abre `report/index.html` o ejecuta `atlas-splitter preview resultados/atlas`. Si las piezas son ambiguas, corrígelas en un editor o usa [revisión manual](manual-review.md); no asumas que una máscara es exacta.

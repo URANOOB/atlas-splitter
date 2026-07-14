@@ -1,39 +1,24 @@
 # Inicio rápido
 
-Este flujo te permite probar el programa en minutos usando datos de ejemplo sin necesidad de GPU ni modelos de IA.
-
-## Flujo: Instalar → Doctor → Procesar → Reporte
-
-1. **Verifica tu entorno**
-   Asegúrate de que la instalación es correcta ejecutando:
-   ```text
-   atlas-splitter doctor
-   ```
-
-2. **Procesa un ejemplo**
-   Usa una imagen de ejemplo (incluida si clonaste el repo, o descarga cualquier textura con transparencia):
-   ```text
-   atlas-splitter split examples/atlas-only/atlas.webp --output resultados
-   ```
-
-3. **Revisa el resultado visualmente**
-   El programa genera un reporte interactivo en HTML. Para abrirlo:
-   ```text
-   atlas-splitter preview resultados/atlas
-   ```
-
-## Árbol esperado
-
-Tras ejecutar `split`, el directorio `resultados/atlas` tendrá esta estructura:
+Este flujo no necesita GPU, YAML ni modelos. El repositorio incluye un generador de atlas pequeño para comprobar la instalación.
 
 ```text
-resultados/
-└── atlas/
-    ├── report/
-    │   └── index.html       
-    ├── manifest.json        
-    └── objects/
-        ├── obj_0000.png     
-        ├── obj_0001.png     
-        └── ...
+atlas-splitter doctor
+python scripts/create_test_atlas.py
+atlas-splitter split work/synthetic_atlas.webp --output resultados
+atlas-splitter preview resultados/synthetic_atlas
 ```
+
+Después de `split` encontrarás:
+
+```text
+resultados/synthetic_atlas/
+├── source/synthetic_atlas.webp
+├── manifest.json
+├── png/
+├── masks/
+├── psd/
+└── report/index.html
+```
+
+El reporte es HTML autocontenido y se puede regenerar. Las piezas son visuales y aproximadas: abre el reporte y comprueba bordes, transparencias y elementos pequeños antes de continuar.

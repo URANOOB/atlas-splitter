@@ -1,46 +1,26 @@
 # Estructura de salida
 
+Los nombres exactos dependen del atlas y de las opciones activadas. No edites rutas internas de un proyecto visual: `source/` y `manifest.json` deben viajar juntos.
+
 ## `split`
+
 ```text
-resultados/
-├── manifest.json        (Generado)
-├── report/              (Temporales/Regenerables)
-│   └── index.html
-└── objects/             (Permanentes)
-    ├── obj_000.png
-    └── obj_001.png
+resultados/atlas/
+├── source/atlas.webp       # conservar
+├── manifest.json           # generado
+├── png/                    # piezas PNG
+├── masks/                  # máscaras PNG
+├── psd/                    # si include_psd=true
+├── contact_sheet.png       # si hay piezas
+└── report/index.html       # regenerable con preview
 ```
 
-## `semantic`
-Añade a lo anterior:
-```text
-├── semantic_manifest.json (Generado)
-├── review.json            (Editable)
-└── grouped/               (Generados/Regenerables)
-    ├── walls/
-    │   └── obj_000.png
-    └── uncertain/
-```
+El ZIP predeterminado se crea junto al directorio como `atlas-atlas-splitter.zip`. No lo pongas dentro del mismo árbol que vas a comprimir.
 
-## `extract`
-```text
-resultados/
-├── uv_manifest.json       (Generado)
-├── objects_manifest.json  (Generado)
-├── project.json           (Raíz de Blender, Permanente)
-└── blender/               (Generado)
-    └── rebuild_scene.py
-```
+## `semantic` y revisión
 
-## Revisión aplicada
-Si ejecutas `apply-review`, aparecerá:
-```text
-├── review_applied.json    (Registro, no editable)
-```
-Y la carpeta `grouped/` será regenerada con tus cambios manuales.
+Además del resultado visual aparecen `semantic_manifest.json`, `grouping_manifest.json`, `review.json`, `grouped/`, `group_previews/`, `objects/`, `uncertain/` y `unassigned/`. `review.json` es editable; `review_applied.json` aparece después de aplicar una revisión y registra lo aplicado.
 
-## Add-on exportado
-Al usar `blender-addon export --output .` obtienes:
-```text
-└── atlas_splitter_blender.zip
-```
+## `extract` y add-on
+
+Una extracción geométrica puede producir `uv_manifest.json`; con varios atlas también `objects_manifest.json`, `project.json` y `blender/rebuild_scene.py`. El comando `atlas-splitter blender-addon export --output carpeta` crea `atlas_splitter_blender.zip` en esa carpeta.

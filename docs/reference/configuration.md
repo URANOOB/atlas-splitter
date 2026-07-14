@@ -1,77 +1,41 @@
 # Configuración
 
-Atlas Splitter permite ajustar su comportamiento mediante un archivo YAML.
-Puedes usar:
-```text
-atlas-splitter config init
-atlas-splitter config validate
-atlas-splitter config show
-```
+Genera una base con `atlas-splitter config init archivo.yml`, revísala con `config validate archivo.yml` y muestra una configuración con `config show`. La CLI tiene prioridad sobre los valores YAML que expone.
 
-## Modelos Pydantic (Campos)
+| Modelo | Campos y valores predeterminados |
+| --- | --- |
+| `AppConfig` | `device=auto`, `model=sam2-small` y los seis grupos siguientes. |
+| `SegmentationConfig` | `confidence=.88`, `stability=.92`, `min_area=400`, `max_area_ratio=.45`, `duplicate_iou=.80`, `preserve_small=true`, `background_threshold=24`, `morphology_kernel=3`, `sam2_points_per_side=16`, `sam2_points_per_batch=16`, `sam2_edge_padding=4`. |
+| `ProcessingConfig` | `padding=16`, `crop_elements=false`, `use_mixed_precision=true`. |
+| `OutputConfig` | `include_psd=true`, `include_png=true`, `include_masks=true`, `create_contact_sheet=true`, `create_zip=true`. |
+| `GroupingConfig` | `enabled=false`, `backend=qwen3-vl`, `model=qwen3-vl-2b`, `device=auto`, `minimum_confidence=.70`, `automatic_confidence=.80`, `max_pieces_per_sheet=25`, `naming_language=en`, `keep_semantic_inputs=false`. |
+| `GltfConfig` | `group_by=uv-island`, `uv_tolerance=0.000001`, `texture_slot=baseColor`, `crop_padding=2`, `export_blender_script=true`. |
+| `SemanticConfig` | `enabled=false`, `backend=qwen3-vl`, `model=Qwen/Qwen3-VL-4B-Instruct`, `min_confidence=.65`, `allow_uncertain=true`, `refine_with_sam2=false`. |
 
-### AppConfig
-| Campo | Tipo | Predeterminado | Valores | Descripción |
-| --- | --- | --- | --- | --- |
-| `processing` | `ProcessingConfig` | (Por defecto) | - | Parámetros de procesamiento principal |
-| `segmentation` | `SegmentationConfig`| (Por defecto) | - | Parámetros de visión |
-| `output` | `OutputConfig` | (Por defecto) | - | Destinos y verbosidad |
-| `semantic` | `SemanticConfig` | (Por defecto) | - | Ajustes de IA |
-| `gltf` | `GltfConfig` | (Por defecto) | - | Opciones de extracción |
-| `grouping` | `GroupingConfig` | (Por defecto) | - | Ajustes de grupos |
+Los límites son: confidencias y ratios entre 0 y 1; `min_area` desde 1; kernel de 1 a 31; puntos SAM 2 de 4 a 64; y padding SAM 2 de 0 a 8. `automatic_confidence` no puede ser menor que `minimum_confidence`. `device` admite `auto`, `cpu`, `cuda` o `mps`; `texture_slot` admite `baseColor`, `normal`, `metallicRoughness`, `occlusion` y `emissive`.
 
-### SegmentationConfig
-| Campo | Tipo | Predeterminado | Valores | Descripción |
-| --- | --- | --- | --- | --- |
-| `min_area` | `int` | `4` | `>0` | Área mínima en píxeles para ignorar ruido |
-| `padding` | `int` | `2` | `>=0` | Píxeles transparentes extra añadidos a cada recorte |
-
-### ProcessingConfig
-| Campo | Tipo | Predeterminado | Valores | Descripción |
-| --- | --- | --- | --- | --- |
-| `max_threads` | `int` | `8` | `>=1` | Máximo número de hilos simultáneos |
-
-### OutputConfig
-| Campo | Tipo | Predeterminado | Valores | Descripción |
-| --- | --- | --- | --- | --- |
-| `verbose` | `bool` | `false` | `true`, `false` | Mostrar logs detallados |
-| `overwrite` | `bool` | `false` | `true`, `false` | Sobreescribir carpetas destino |
-
-### SemanticConfig
-| Campo | Tipo | Predeterminado | Valores | Descripción |
-| --- | --- | --- | --- | --- |
-| `model_id` | `str` | `"qwen3-vl-2b"` | - | Identificador del modelo de IA a usar |
-| `confidence_threshold` | `float` | `0.8` | `0.0` - `1.0` | Confianza mínima para aceptar grupo |
-
-### GltfConfig
-| Campo | Tipo | Predeterminado | Valores | Descripción |
-| --- | --- | --- | --- | --- |
-| `flip_v` | `bool` | `true` | `true`, `false` | Invertir coordenada V al exportar |
-
-### GroupingConfig
-| Campo | Tipo | Predeterminado | Valores | Descripción |
-| --- | --- | --- | --- | --- |
-| `max_groups` | `int` | `100` | `>=1` | Límite máximo de carpetas |
-
-## YAML Mínimo
+## YAML mínimo
 
 ```yaml
-version: 1
 segmentation:
-  min_area: 10
+  min_area: 200
+processing:
+  padding: 8
 ```
 
-## YAML Avanzado
+## YAML avanzado
 
 ```yaml
-version: 1
+device: cpu
 segmentation:
-  min_area: 5
-  padding: 4
+  min_area: 200
+  duplicate_iou: 0.85
+processing:
+  crop_elements: true
 output:
-  verbose: true
-  overwrite: false
-semantic:
-  confidence_threshold: 0.85
-  model_id: "qwen3-vl-2b"
+  create_zip: false
+grouping:
+  enabled: false
 ```
+
+No añadas claves desconocidas: los modelos Pydantic las rechazan. La configuración semántica y la de geometría describen capacidades opcionales; instalarlas y descargar modelos sigue siendo una decisión explícita.

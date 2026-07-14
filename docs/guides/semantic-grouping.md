@@ -1,47 +1,13 @@
 # Agrupación semántica
 
-Puedes agrupar piezas visuales basándote en inteligencia artificial para inferir qué representan (por ejemplo, "pared", "suelo", "personaje").
+`semantic` separa el atlas y usa Qwen3-VL local para proponer nombres y grupos. Es una ayuda de clasificación, no una afirmación sobre la geometría ni una reconstrucción del objeto.
 
-## ¿Qué hace Qwen3-VL?
-Es un modelo de lenguaje visual. Analiza la imagen recortada y devuelve un nombre que describe su contenido.
-* **Tamaño aproximado:** Requiere descargar varios gigabytes.
-* **Requisitos:** Debes ejecutar `setup ai`.
-* **Procesamiento local:** Ninguna imagen se envía a servidores externos. Qwen3-VL corre en tu máquina.
-
-## CPU, CUDA y MPS
-* **CPU:** Funciona, pero es lento.
-* **CUDA:** Aceleración rápida si tienes una gráfica NVIDIA.
-* **MPS:** Aceleración en procesadores de Apple (M1, M2, etc.).
-
-## Confianza y Estados
-La IA evalúa cada pieza y asigna:
-* **Confianza:** Un número de 0.0 a 1.0.
-* **Grupos aceptados:** Si la confianza es alta.
-* **Grupos inciertos:** Si el modelo duda, se envían a revisión.
-* **Grupos rechazados:** Se marcan como no asignados.
-* **Errores de clasificación:** La IA puede equivocarse y llamar "pared" a una "mesa". Siempre puedes arreglarlo en la revisión manual.
-
-## Comandos
-
-Preparar el entorno y descargar (descarga explícita):
 ```text
 atlas-splitter setup ai
 atlas-splitter models download qwen3-vl-2b
-```
-
-Agrupar semánticamente:
-```text
 atlas-splitter semantic atlas.webp --output resultados
 ```
 
-## Salida generada
+La descarga es explícita. El modelo puede trabajar en CPU, CUDA o MPS según el equipo, pero CPU suele ser más lenta. Las propuestas se clasifican como aceptadas, inciertas o rechazadas según su confianza; revísalas antes de usarlas.
 
-```text
-semantic_manifest.json
-review.json
-grouped/
-objects/
-uncertain/
-unassigned/
-report/index.html
-```
+El resultado añade `semantic_manifest.json`, `review.json`, `grouped/`, `objects/`, `uncertain/`, `unassigned/` y un reporte. `group` aplica la misma etapa a una extracción visual existente. Conserva los PNG y máscaras originales: las salidas semánticas no los sustituyen.

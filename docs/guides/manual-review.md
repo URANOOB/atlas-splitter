@@ -1,43 +1,15 @@
 # Revisión manual
 
-Cuando usas la agrupación semántica, o en cualquier momento que generes un archivo de revisión, puedes corregir manualmente los grupos o nombres.
-
-## El archivo `review.json`
-
-Almacena el estado pendiente de tus cambios.
+`atlas-splitter review resultados/atlas` crea `review.json` si todavía no existe. Edita sólo ese archivo para decidir qué piezas pertenecen a cada grupo.
 
 ```json
-{
-  "version": 1,
-  "source": "semantic",
-  "groups": [
-    {
-      "name": "walls",
-      "piece_ids": ["E001", "E002"],
-      "confidence": 0.91,
-      "status": "accepted"
-    }
-  ],
-  "unassigned_piece_ids": ["E003"]
-}
+{"version":1,"source":"semantic","groups":[{"name":"walls","piece_ids":["E001","E002"],"confidence":0.91,"status":"accepted"}],"unassigned_piece_ids":["E003"]}
 ```
 
-## Cómo modificarlo
+Los nombres usan letras minúsculas, números, guiones o guiones bajos. Mueve un ID entre `groups` y `unassigned_piece_ids` para reclasificarlo. Cada ID debe aparecer exactamente una vez; no dupliques ni elimines piezas. La confianza y el estado son útiles para registrar la decisión, no para ejecutar una inferencia nueva.
 
-* **Renombrar:** Cambia el valor `"name"` a lo que desees.
-* **Mover IDs:** Mueve un ID como `"E001"` a otra lista `piece_ids`.
-* **Dejar sin asignar:** Mueve el ID a `unassigned_piece_ids`.
-* **Evitar duplicados:** Un ID de pieza no puede existir en dos grupos simultáneamente.
-
-## Aplicar revisión
-
-Para previsualizar tu estado actual:
-```text
-atlas-splitter review resultados/atlas
-```
-
-Para aplicar los cambios y regenerar las carpetas de imágenes agrupadas:
 ```text
 atlas-splitter apply-review resultados/atlas/review.json
 ```
-*(Nota: `apply-review` es un comando avanzado para procesar manualmente los archivos de revisión. Los archivos originales en `objects/` siempre se conservan intactos).*
+
+`apply-review` continúa oculto como herramienta avanzada de compatibilidad. Copia las piezas a `groups/` o `unassigned/`, conserva los PNG y máscaras originales y escribe `review_applied.json`.

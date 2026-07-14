@@ -1,11 +1,1 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Atlas Splitter objects manifest",
-  "type": "object",
-  "required": ["schema_version", "source_file", "objects"],
-  "properties": {
-    "schema_version": {"const": "1.0"},
-    "source_file": {"type": "string"},
-    "objects": {"type": "array"}
-  }
-}
+{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"Atlas Splitter objects manifest","type":"object","required":["schema_version","source_file","capabilities","objects"],"properties":{"schema_version":{"const":"1.0"},"source_file":{"type":"string"},"capabilities":{"type":"object"},"warnings":{"type":"array","items":{"type":"string"}},"objects":{"type":"array","items":{"type":"object","required":["object_id","node_index","node_name"],"properties":{"object_id":{"type":"string","pattern":"^object_[a-f0-9]{16}$"},"node_index":{"type":"integer","minimum":0},"node_name":{"type":"string"},"node_path":{"type":"array","items":{"type":"string"}},"atlas_path":{"type":["string","null"]},"atlas_paths":{"type":"array","items":{"type":"string"}},"flip_v":{"type":"boolean"},"parts":{"type":"array"},"associations":{"type":"array"}}}}}}

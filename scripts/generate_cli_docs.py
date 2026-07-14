@@ -53,7 +53,14 @@ def _render_command(command: click.Command, path: tuple[str, ...]) -> list[str]:
     lines = [f"## `{title}`", "", command.help or "Sin descripción.", "", "```text", _usage(command, path), "```", ""]
     rows = _option_rows(command)
     if rows:
-        lines.extend(["| Opción o argumento | Estado | Predeterminado | Descripción |", "| --- | --- | --- | --- |", *rows, ""])
+        lines.extend(
+            [
+                "| Opción o argumento | Estado | Predeterminado | Descripción |",
+                "| --- | --- | --- | --- |",
+                *rows,
+                "",
+            ]
+        )
     return lines
 
 
@@ -86,7 +93,7 @@ def render() -> str:
         lines.extend([
             "## Alias de compatibilidad (Ocultos)",
             "",
-            "Estos comandos existen por razones de compatibilidad con versiones anteriores, pero no deben utilizarse en nuevos flujos de trabajo.",
+            "Estos comandos existen por compatibilidad con versiones anteriores; no los uses en flujos nuevos.",
             ""
         ])
         for name, cmd in hidden_commands:
@@ -100,11 +107,11 @@ def render() -> str:
         "* `0`: Éxito.",
         "* `1`: Error genérico o excepción no controlada.",
         "* `2`: Error de sintaxis en los argumentos de la CLI (generado por Click/Typer).",
-        "* `E001` - `E100`: Revisa la [referencia de códigos de error](error-codes.md).",
+        "* Códigos `AS-*`: Revisa la [referencia de códigos de error](error-codes.md).",
         ""
     ])
             
-    return "\\n".join(lines)
+    return "\n".join(lines)
 
 
 def main() -> int:

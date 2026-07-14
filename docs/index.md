@@ -1,14 +1,10 @@
 # Atlas Splitter
 
-Atlas Splitter es una herramienta CLI para separar regiones visuales de atlas de texturas 2D y, de forma opcional, recuperar asociaciones 3D usando archivos GLB/glTF.
+Atlas Splitter separa atlas de texturas en archivos locales. Un atlas es una imagen que contiene varias piezas, por ejemplo paredes, botones o partes de un modelo. La herramienta crea PNG, máscaras, PSD opcionales, un manifiesto y un reporte HTML para revisarlos.
 
-## ¿Qué problema resuelve?
+![Atlas real de ejemplo: first-house_day.webp](assets/first-house-day-atlas.webp)
 
-Cuando tienes un atlas de texturas, a menudo necesitas separar las piezas individuales para usarlas por separado. Hacer esto a mano en un editor de imágenes es lento y propenso a errores, especialmente si las piezas tienen transparencias complejas o necesitas mantener su relación con un modelo 3D. Atlas Splitter automatiza este proceso de forma local.
-
-![Captura principal](https://raw.githubusercontent.com/URANOOB/atlas-splitter/main/docs/assets/screenshot.webp)
-
-## Selector de flujo
+## Elige el flujo correcto
 
 | Tengo | Debo usar | Resultado |
 | --- | --- | --- |
@@ -18,37 +14,22 @@ Cuando tienes un atlas de texturas, a menudo necesitas separar las piezas indivi
 | Resultado que deseo corregir | `review` | Revisión manual |
 | Proyecto para Blender | `blender-addon` | Add-on y scripts de reconstrucción |
 
-## Instalación mínima
+`split` usa sólo píxeles. `semantic` añade un modelo local para proponer nombres, pero no convierte una propuesta en un hecho. `extract` lee las coordenadas UV del modelo y no modifica el GLB original. `group-3d` organiza componentes existentes; no crea mallas nuevas.
+
+## Instalación mínima y primer resultado
 
 ```text
 pipx install atlas-splitter
-```
-Si deseas características avanzadas como IA o geometría 3D:
-```text
-atlas-splitter setup all
-```
-
-## Primer comando
-
-Para separar un atlas visualmente:
-```text
+atlas-splitter doctor
 atlas-splitter split atlas.webp --output resultados
 ```
 
-## Procesamiento local y privacidad
+Abre o regenera el reporte con `atlas-splitter preview resultados/atlas`. Consulta el [inicio rápido](getting-started/quickstart.md) para usar el ejemplo incluido en el repositorio.
 
-Atlas Splitter procesa todas las imágenes y modelos **localmente** en tu máquina. Tus datos no se envían a la nube para su procesamiento. Las únicas conexiones a Internet se realizan durante la instalación inicial para descargar modelos de IA públicos (si se solicitan).
+## Procesamiento local, plataformas y límites
 
-## Plataformas compatibles
+Las imágenes, modelos, reportes y manifiestos se procesan localmente. Internet sólo se usa al instalar dependencias o cuando una persona solicita descargar un modelo. Python 3.11 a 3.13 funciona en Windows, macOS y Linux; una GPU es opcional.
 
-- Windows 10/11
-- macOS 13+ (Apple Silicon y procesadores Intel)
-- Linux (Ubuntu 22.04+)
+La separación visual no reconstruye geometría 3D y puede unir piezas que se tocan, perder detalles pequeños o fallar con fondos sin transparencia. Revisa siempre el resultado antes de usarlo en producción.
 
-## Limitaciones
-
-- La segmentación visual asume que el fondo es transparente.
-- Los modelos de IA no siempre son 100% precisos en la clasificación semántica.
-- Los atlas muy grandes pueden consumir mucha RAM.
-
-[Inicio rápido](getting-started/quickstart.md) | [Windows Portable](getting-started/windows-portable.md) | [Blender](guides/blender.md)
+Sigue con [Instalación](getting-started/installation.md), [Windows portable](getting-started/windows-portable.md) o la [guía de Blender](guides/blender.md).

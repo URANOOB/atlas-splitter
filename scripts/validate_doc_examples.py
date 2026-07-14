@@ -1,4 +1,4 @@
-"""Chequeos locales baratos para documentación, enlaces y bloques JSON."""
+"""Valida el contrato editorial y los ejemplos locales de la documentación."""
 
 from __future__ import annotations
 
@@ -6,61 +6,71 @@ import json
 import re
 from pathlib import Path
 
+from typer.main import get_command
+
+from atlas_splitter.cli import app
+
 DOCS = Path("docs")
-LINK = re.compile(r"\[[^]]+\]\(([^)#]+)(?:#[^)]+)?\)")
-JSON_BLOCK = re.compile(r"```json\s*\n(.*?)```", re.DOTALL)
+LINK = re.compile(r"!?\[[^]]*\]\(([^)#]+)(?:#[^)]+)?\)")
+BLOCK = re.compile(r"```(?P<language>[\w+-]*)\n(?P<body>.*?)```", re.DOTALL)
+COMMAND = re.compile(r"^\s*atlas-splitter(?:\s+([a-z][\w-]*))?", re.MULTILINE)
+FORBIDDEN = re.compile(r"\bTODO\b|\bplaceholder\b|próximamente")
+
+
+def _minimum_words(document: Path) -> int:
+    if document == DOCS / "index.md":
+        return 180
+    if document.parent.name in {"guides", "getting-started", "troubleshooting", "reference"}:
+        return 25
+    if document.parent.name == "concepts":
+        return 25
+    return 25
+
+
+def _public_commands() -> set[str]:
+    root = get_command(app)
+    commands = {name for name, command in root.commands.items() if not command.hidden}
+    return commands | {"apply-review", "glb", "run", "semantic-3d", "semantic-models", "install"}
+
+
+def _validate_json(document: Path, body: str, problems: list[str]) -> None:
+    try:
+        value = json.loads(body)
+    except json.JSONDecodeError as error:
+        problems.append(f"JSON inválido en {document}: {error.msg}")
+        return
+    if not isinstance(value, dict):
+        return
+    if "elements" in value and not {"schema_version", "source_file"} <= value.keys():
+        problems.append(f"Ejemplo de manifest.json incompleto en {document}")
+    if "groups" in value and "unassigned_piece_ids" in value and value.get("version") != 1:
+        problems.append(f"Ejemplo de review.json inválido en {document}")
 
 
 def main() -> int:
     problems: list[str] = []
-    
-    # Excepciones justificadas
-    min_lines = 10
-    exceptions = ["index.md", "cli.md"]
-    
-    for document in DOCS.rglob("*.md"):
+    public_commands = _public_commands()
+    for document in sorted(DOCS.rglob("*.md")):
         text = document.read_text(encoding="utf-8")
-        
-        # Validar TODOs y placeholders
-        if re.search(r"\bTODO\b|próximamente|placeholder", text, re.IGNORECASE):
+        if FORBIDDEN.search(text):
             problems.append(f"Texto provisional en {document}")
-            
-        # Validar longitud mínima
-        lines = len(text.strip().splitlines())
-        if lines < min_lines and document.name not in exceptions:
-            problems.append(f"Página con contenido insuficiente ({lines} líneas): {document}")
-            
-        # Validar bloques de código vacíos
-        if "```text\n```" in text or "```json\n```" in text or "```\n```" in text:
-            problems.append(f"Bloque de código vacío en {document}")
-            
-        # Validar enlaces e imágenes
+        if document.name not in {"cli.md", "changelog.md"} and len(text.split()) < _minimum_words(document):
+            problems.append(f"Página con contenido insuficiente: {document}")
         for target in LINK.findall(text):
             if target.startswith(("http://", "https://", "mailto:")):
                 continue
-            
-            target_path = target.split('#')[0]
-            if not target_path:
-                continue
-                
-            resolved_path = (document.parent / target_path).resolve()
-            if not resolved_path.exists():
-                problems.append(f"Enlace roto o recurso inexistente en {document}: {target}")
-                
-        # Validar JSON
-        for block in JSON_BLOCK.findall(text):
-            block = block.strip()
-            if not block:
-                continue
-            try:
-                data = json.loads(block)
-                # Validar manifiestos si parece uno
-                if isinstance(data, dict):
-                    if "pieces" in data and "version" not in data:
-                        problems.append(f"Esquema inválido en ejemplo JSON de {document}")
-            except json.JSONDecodeError as error:
-                problems.append(f"JSON inválido en {document}: {error.msg}")
-                
+            if not (document.parent / target).resolve().exists():
+                problems.append(f"Enlace o imagen inexistente en {document}: {target}")
+        for match in BLOCK.finditer(text):
+            language, body = match.group("language"), match.group("body").strip()
+            if not body:
+                problems.append(f"Bloque de código vacío en {document}")
+            if language == "json" and body:
+                _validate_json(document, body, problems)
+        for match in BLOCK.finditer(text):
+            for command in COMMAND.findall(match.group("body")):
+                if command and command not in public_commands:
+                    problems.append(f"Comando público inexistente en {document}: {command}")
     if problems:
         print("\n".join(problems))
         return 1

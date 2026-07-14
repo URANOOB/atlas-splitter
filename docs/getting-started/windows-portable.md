@@ -1,12 +1,13 @@
-# Windows Portable
+# Windows portable
 
-Para entornos sin conexión o donde no tienes permisos para instalar Python globalmente, puedes usar la versión portable.
+La release Lite para Windows se llama `AtlasSplitter-Lite.zip`. Descárgala desde Releases, extráela en una carpeta local y ejecuta `AtlasSplitter-Lite.exe` desde PowerShell o el Explorador.
 
-1. Descarga el archivo `atlas-splitter-portable-win64.zip` desde la sección de Releases.
-2. Descomprímelo en un directorio de tu elección (ej. `C:\AtlasSplitter`).
-3. Abre un símbolo del sistema en esa carpeta y ejecuta:
-   ```cmd
-   atlas-splitter.exe --help
-   ```
+```text
+AtlasSplitter-Lite.exe --version
+AtlasSplitter-Lite.exe doctor --format json
+AtlasSplitter-Lite.exe split atlas.webp --output resultados
+```
 
-Todos los comandos y guías documentadas aquí son idénticos; simplemente usa el archivo `.exe` en lugar del comando de pipx.
+La edición Lite no incluye modelos de IA ni CUDA. No necesita descargar modelos para `split`, `preview`, `review`, `inspect` o la exportación del add-on. Ejecuta `doctor` para ver qué capacidades locales faltan.
+
+No ejecutes el ZIP sin extraerlo. Conserva el ejecutable y sus archivos vecinos juntos; mover sólo el `.exe` rompe la distribución portátil.
