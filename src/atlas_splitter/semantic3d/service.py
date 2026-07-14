@@ -16,6 +16,7 @@ from atlas_splitter.blender.script_writer import write_semantic_objects_rebuild_
 from atlas_splitter.exceptions import GltfLoadError
 from atlas_splitter.geometry.glb_loader import load_gltf
 from atlas_splitter.geometry.primitive_decoder import decode_scene_primitives
+from atlas_splitter.geometry.texture_resolver import material_texture_bindings
 from atlas_splitter.geometry.types import DecodedPrimitive
 from atlas_splitter.geometry.uv_rasterizer import rasterize_uv_triangles
 from atlas_splitter.reporting.semantic_contact_sheet import write_semantic_contact_sheet
@@ -35,11 +36,13 @@ class GroupingBackend(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class Semantic3DConfig:
-    """Parámetros explícitos y conservadores de la primera fase."""
+    """Parámetros explícitos y conservadores del agrupamiento semántico 3D."""
 
     minimum_confidence: float = 0.70
     proximity_factor: float = 0.08
     flip_v: bool = True
+    texture_index: int | None = None
+    uv_set: int = 0
 
 
 def group_first_house(
@@ -49,11 +52,12 @@ def group_first_house(
     backend: GroupingBackend,
     config: Semantic3DConfig | None = None,
 ) -> Path:
-    """Crea artefactos semánticos para el único nodo First_House_Baked.
+    """Alias heredado para el nodo ``First_House_Baked``.
 
     No modifica el GLB ni une geometría: sólo registra componentes y genera un
     script Blender que los separa de nuevo como objetos editables.
     """
+    LOGGER.warning("group_first_house está deprecado; use group_semantic_3d con un selector --node explícito.")
     return group_semantic_3d(model_path, atlas_path, output_root, backend, config, node_name=_NODE_NAME)
 
 
@@ -77,23 +81,28 @@ def group_semantic_3d(
     loaded = load_gltf(model_path)
     if not atlas_path.is_file():
         raise GltfLoadError(f"No existe el atlas local: {atlas_path}")
-    candidates = [item for item in decode_scene_primitives(loaded) if 0 in item.texcoords]
+    if effective_config.uv_set < 0:
+        raise GltfLoadError("uv_set debe ser un entero mayor o igual a cero.")
+    if effective_config.proximity_factor < 0:
+        raise GltfLoadError("proximity_factor no puede ser negativo.")
+    candidates = [item for item in decode_scene_primitives(loaded) if effective_config.uv_set in item.texcoords]
     if node_index is not None:
         candidates = [item for item in candidates if item.reference.node_index == node_index]
     if mesh_index is not None:
         candidates = [item for item in candidates if item.reference.mesh_index == mesh_index]
     if node_name is not None:
         candidates = [item for item in candidates if item.node_path and item.node_path[-1] == node_name]
+    if effective_config.texture_index is not None:
+        candidates = [
+            item for item in candidates if _primitive_uses_texture(loaded, item, effective_config.texture_index)
+        ]
     node_ids = sorted({item.reference.node_index for item in candidates})
     if not candidates:
-        raise GltfLoadError("No se encontró un nodo con TEXCOORD_0 que coincida con los selectores indicados.")
+        raise GltfLoadError("No se encontró una primitiva que coincida con los selectores de nodo, textura y UV.")
     if len(node_ids) > 1:
         raise GltfLoadError(
             "Hay varios nodos con UV compatibles. Use --node o --mesh-index para seleccionar uno explícitamente."
         )
-    if len(candidates) != 1:
-        raise GltfLoadError("El nodo seleccionado contiene varias primitivas; use --mesh-index para desambiguar.")
-    primitive = candidates[0]
     destination = output_root.resolve() / atlas_path.stem / "semantic_objects"
     if destination.exists():
         raise FileExistsError(f"La salida semántica ya existe y no se sobrescribirá: {destination}")
@@ -101,7 +110,7 @@ def group_semantic_3d(
     try:
         with Image.open(atlas_path) as image:
             atlas = image.convert("RGBA")
-        components, _ = _write_components(destination, primitive, atlas, flip_v=effective_config.flip_v)
+        components, _ = _write_components_for_primitives(destination, candidates, atlas, effective_config)
         proximity_edges = _proximity_proposals(components, effective_config.proximity_factor)
         proposals, pieces = _write_proposals(destination, atlas, components, proximity_edges)
         sheet = destination / "contact_sheets" / "proposals.png"
@@ -126,7 +135,7 @@ def group_semantic_3d(
             proximity_edges,
             effective_config,
             inference_error,
-            primitive,
+            candidates,
         )
         _write_group_previews(destination, manifest, atlas)
         _write_json(destination / "semantic_objects_manifest.json", manifest)
@@ -141,12 +150,31 @@ def group_semantic_3d(
     return destination
 
 
+def _write_components_for_primitives(
+    destination: Path, primitives: list[DecodedPrimitive], atlas: Image.Image, config: Semantic3DConfig
+) -> tuple[list[dict[str, object]], list[PieceReference]]:
+    """Conserva componentes por primitiva, incluso cuando un nodo tiene varias."""
+    components: list[dict[str, object]] = []
+    pieces: list[PieceReference] = []
+    for primitive in primitives:
+        primitive_components, primitive_pieces = _write_components(
+            destination,
+            primitive,
+            atlas,
+            flip_v=config.flip_v,
+            uv_set=config.uv_set,
+        )
+        components.extend(primitive_components)
+        pieces.extend(primitive_pieces)
+    return components, pieces
+
+
 def _write_components(
-    destination: Path, primitive: DecodedPrimitive, atlas: Image.Image, *, flip_v: bool
+    destination: Path, primitive: DecodedPrimitive, atlas: Image.Image, *, flip_v: bool, uv_set: int
 ) -> tuple[list[dict[str, object]], list[PieceReference]]:
     positions = np.asarray(primitive.positions, dtype=np.float64)
     triangles = np.asarray(primitive.triangle_indices, dtype=np.int64)
-    uvs = _external_atlas_uvs(np.asarray(primitive.texcoords[0], dtype=np.float64), flip_v)
+    uvs = _external_atlas_uvs(np.asarray(primitive.texcoords[uv_set], dtype=np.float64), flip_v)
     transform = np.asarray(primitive.node_transform, dtype=np.float64)
     atlas_pixels = np.asarray(atlas)
     homogeneous = np.column_stack((positions, np.ones(len(positions))))
@@ -154,7 +182,7 @@ def _write_components(
     components: list[dict[str, object]] = []
     pieces: list[PieceReference] = []
     for part in mesh_connected_components(triangles):
-        component_id = f"component_{part.component_index:03d}"
+        component_id = f"primitive_{primitive.reference.primitive_index:03d}_component_{part.component_index:03d}"
         component_triangles = triangles[part.triangle_rows]
         region = rasterize_uv_triangles(uvs, component_triangles, atlas.width, atlas.height)
         component_dir = destination / "components" / component_id
@@ -171,6 +199,13 @@ def _write_components(
         components.append(
             {
                 "component_id": component_id,
+                "source_primitive": {
+                    "node_index": primitive.reference.node_index,
+                    "mesh_index": primitive.reference.mesh_index,
+                    "primitive_index": primitive.reference.primitive_index,
+                    "uv_set": uv_set,
+                },
+                "geometry_evidence": "exact",
                 "triangle_rows": part.triangle_rows.tolist(),
                 "vertex_indices": part.vertex_indices.tolist(),
                 "triangle_count": int(len(part.triangle_rows)),
@@ -202,6 +237,14 @@ def _external_atlas_uvs(uvs: np.ndarray, flip_v: bool) -> np.ndarray:
     transformed = uvs.copy()
     transformed[:, 1] = 1.0 - transformed[:, 1]
     return transformed
+
+
+def _primitive_uses_texture(loaded: Any, primitive: DecodedPrimitive, texture_index: int) -> bool:
+    """Comprueba la textura declarada sin inferir asociaciones por nombre."""
+    material_index = primitive.reference.material_index
+    if material_index is None:
+        return False
+    return any(binding.texture_index == texture_index for binding in material_texture_bindings(loaded, material_index))
 
 
 def _proximity_proposals(components: list[dict[str, object]], factor: float) -> list[dict[str, object]]:
@@ -310,7 +353,7 @@ def _manifest(
     proximity_edges: list[dict[str, object]],
     config: Semantic3DConfig,
     inference_error: str | None,
-    primitive: DecodedPrimitive | None = None,
+    primitives: list[DecodedPrimitive] | None = None,
 ) -> dict[str, object]:
     known = {str(item["proposal_id"]): item for item in proposals}
     groups: list[dict[str, object]] = []
@@ -338,13 +381,21 @@ def _manifest(
         "atlas_file": str(atlas.resolve()),
         "node": {
             "name": (
-                primitive.node_path[-1] if primitive is not None and primitive.node_path else _NODE_NAME
+                primitives[0].node_path[-1] if primitives and primitives[0].node_path else _NODE_NAME
             ),
-            "node_index": primitive.reference.node_index if primitive is not None else 0,
-            "mesh_index": primitive.reference.mesh_index if primitive is not None else None,
-            "uv_set": 0,
+            "node_index": primitives[0].reference.node_index if primitives else 0,
+            "mesh_index": primitives[0].reference.mesh_index if primitives else None,
+            "uv_set": config.uv_set,
             "association_method": "manual_explicit_atlas",
         },
+        "source_primitives": [
+            {
+                "node_index": item.reference.node_index,
+                "mesh_index": item.reference.mesh_index,
+                "primitive_index": item.reference.primitive_index,
+            }
+            for item in primitives or []
+        ],
         "components": components,
         "proximity_objects": proposals,
         "groups": groups,
@@ -354,6 +405,13 @@ def _manifest(
             "minimum_confidence": config.minimum_confidence,
             "proximity_factor": config.proximity_factor,
             "flip_v": config.flip_v,
+            "texture_index": config.texture_index,
+            "uv_set": config.uv_set,
+        },
+        "evidence": {
+            "geometry_components": "exact",
+            "proximity_proposals": "exact_geometry",
+            "semantic_group_names": "semantic_inference",
         },
         "inference_error": inference_error,
         "non_destructive": True,
@@ -379,6 +437,8 @@ def _group_record(
         "confidence": round(float(confidence), 4),
         "status": status,
         "reason": reason,
+        "geometry_evidence": "exact",
+        "semantic_evidence": "inference" if confidence else "none",
     }
 
 

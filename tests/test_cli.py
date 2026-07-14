@@ -14,6 +14,10 @@ def test_models_list() -> None:
 def test_new_modes_expose_help() -> None:
     assert runner.invoke(app, ["glb", "--help"]).exit_code == 0
     assert runner.invoke(app, ["semantic", "--help"]).exit_code == 0
+    semantic_3d_help = runner.invoke(app, ["semantic-3d", "--help"])
+    assert semantic_3d_help.exit_code == 0
+    assert "--texture-index" in semantic_3d_help.stdout
+    assert "--uv-set" in semantic_3d_help.stdout
 
 
 def test_run_rejects_a_missing_source(tmp_path) -> None:

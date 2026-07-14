@@ -243,10 +243,12 @@ def semantic_3d(
     model: Annotated[Path, typer.Argument(help="GLB/glTF local")],
     atlas: Annotated[Path, typer.Argument(help="Atlas local confirmado por la persona usuaria")],
     output: Annotated[Path, typer.Option(help="Raíz de salida GLB")] = Path("outputs"),
-    device: Annotated[str, typer.Option(help="auto, cpu o cuda para Qwen3-VL local")] = "cuda",
+    device: Annotated[str, typer.Option(help="auto, cpu o cuda para Qwen3-VL local")] = "auto",
     minimum_confidence: Annotated[float, typer.Option(help="Confianza mínima para aceptar un grupo")] = 0.70,
     node: Annotated[int | None, typer.Option(help="Índice del nodo glTF a analizar")] = None,
     mesh_index: Annotated[int | None, typer.Option(help="Índice de malla para desambiguar")] = None,
+    texture_index: Annotated[int | None, typer.Option(help="Índice de textura glTF a analizar")] = None,
+    uv_set: Annotated[int, typer.Option(help="Conjunto UV (TEXCOORD_n) a usar")] = 0,
     flip_v: Annotated[bool, typer.Option(help="Invierte V para el atlas externo")] = True,
     proximity_factor: Annotated[float, typer.Option(help="Distancia relativa para propuestas 3D")] = 0.08,
 ) -> None:
@@ -262,7 +264,7 @@ def semantic_3d(
             atlas,
             output,
             backend,
-            Semantic3DConfig(minimum_confidence, proximity_factor, flip_v),
+            Semantic3DConfig(minimum_confidence, proximity_factor, flip_v, texture_index, uv_set),
             node_index=node,
             mesh_index=mesh_index,
         )
