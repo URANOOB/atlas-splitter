@@ -39,8 +39,8 @@ class DeviceResolutionError(AtlasSplitterError):
     """El dispositivo solicitado no puede usarse en este equipo."""
 
     code = "AS-MODEL-003"
-    probable_cause = "CUDA no esta disponible o el dispositivo indicado no es valido."
-    solution = "Use --device auto o --device cpu, o instale PyTorch compatible con CUDA."
+    probable_cause = "CUDA o MPS no estan disponibles, o el dispositivo indicado no es valido."
+    solution = "Use --device auto o --device cpu, o instale PyTorch compatible con el acelerador solicitado."
 
 
 class Sam2InferenceError(AtlasSplitterError):

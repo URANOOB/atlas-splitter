@@ -363,7 +363,7 @@ def run(
         bool | None, typer.Option("--auto-group/--no-auto-group", help="Agrupar piezas semánticamente")
     ] = None,
     semantic_model: Annotated[str | None, typer.Option(help="Modelo semántico local")] = None,
-    semantic_device: Annotated[str | None, typer.Option(help="auto, cpu o cuda para el modelo semántico")] = None,
+    semantic_device: Annotated[str | None, typer.Option(help="auto, cpu, cuda o mps para el modelo semántico")] = None,
     group_confidence: Annotated[float | None, typer.Option(help="Confianza mínima de agrupación")] = None,
     auto_group_confidence: Annotated[float | None, typer.Option(help="Confianza para aceptación automática")] = None,
     max_pieces_per_sheet: Annotated[int | None, typer.Option(help="Máximo de piezas por hoja semántica")] = None,

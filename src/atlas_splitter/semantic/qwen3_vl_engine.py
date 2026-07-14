@@ -54,7 +54,8 @@ class Qwen3VLSemanticGroupingBackend(SemanticGroupingBackend):
         except ImportError as error:
             raise SemanticModelUnavailableError('Instale el extra opcional: pip install -e ".[semantic]"') from error
         model_path = semantic_model_path(self.model_name)
-        selected = resolve_device(self.device)
+        resolution = resolve_device(self.device)
+        selected = resolution.selected
         dtype = torch.float32
         if selected == "cuda":
             dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
