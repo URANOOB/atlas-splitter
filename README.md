@@ -1,6 +1,6 @@
 # Atlas Splitter
 
-[![CI](https://github.com/URANOOB/atlas-splitter/actions/workflows/ci.yml/badge.svg)](https://github.com/URANOOB/atlas-splitter/actions/workflows/ci.yml) [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](pyproject.toml) [![Ruff](https://img.shields.io/badge/lint-Ruff-261230)](https://docs.astral.sh/ruff/) [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![CI](https://github.com/URANOOB/atlas-splitter/actions/workflows/ci.yml/badge.svg)](https://github.com/URANOOB/atlas-splitter/actions/workflows/ci.yml) [![Python](https://img.shields.io/badge/python-3.11--3.13-blue)](pyproject.toml) [![Ruff](https://img.shields.io/badge/lint-Ruff-261230)](https://docs.astral.sh/ruff/) [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 > Convierte atlas de texturas en piezas editables mediante segmentación 2D o coordenadas UV exactas de GLB/glTF. Todo el procesamiento es local.
 
@@ -53,26 +53,41 @@ segmentation:
   sam2_edge_padding: 4
 ```
 
-Usa `--device auto` para escoger CUDA cuando esté disponible o CPU de forma segura; `--device cpu` fuerza CPU.
+Usa `--device auto` para escoger CUDA, MPS o CPU de forma segura; `--device cpu` fuerza CPU.
 
 ## Comandos directos
 
 ```text
-atlas-splitter atlas.webp resultados
-atlas-splitter run ./atlases --recursive --output resultados --calibration-pixels 4
-atlas-splitter glb modelo.glb --atlas-dir ./atlases --output resultados
-atlas-splitter doctor
+atlas-splitter split atlas.webp --output resultados
+atlas-splitter extract modelo.glb --atlas atlas.webp --output resultados
+atlas-splitter group resultados/atlas
+atlas-splitter review resultados/atlas
+atlas-splitter apply-review resultados/atlas/review.json
+atlas-splitter preview resultados/atlas
+atlas-splitter inspect modelo.glb
+atlas-splitter inspect modelo.gltf --format json
+atlas-splitter doctor --format json
 atlas-splitter models list
 atlas-splitter semantic-models list
 ```
 
+`split` usa recuperación visual aproximada. `extract` usa UV exactas cuando el modelo las incluye. `group` no descarga Qwen3-VL: solicita que esté instalado localmente. Usa `review` y `apply-review` para corregir grupos sin volver a procesar el atlas.
+
 ## Instalación aislada
+
+También puede instalarse directamente desde GitHub con `pipx` (hasta que exista una publicación en PyPI):
+
+```text
+pipx install git+https://github.com/URANOOB/atlas-splitter.git
+```
 
 La forma recomendada crea el entorno y dependencias sin tocar el Python global:
 
 ```text
 atlas-splitter install
 ```
+
+`inspect` no altera el modelo y muestra nodos, mallas, primitivas, materiales, UV sets, animaciones, Draco y candidatos de extracción. Con `--atlas-dir`, la asociación automática primero compara el contenido RGBA y dimensiones, y sólo usa nombres normalizados como evidencia de menor confianza. Si hay ambigüedad, proporciona `--bindings`.
 
 También puedes crear un entorno del proyecto sin tocar Python global:
 
@@ -104,9 +119,13 @@ pip install -e ".[vision,semantic,geometry]"
 
 En macOS/Linux y Windows se usa el mismo ejecutable: `atlas-splitter`. Añade `atlas-splitter install --model sam2-small` sólo si deseas preparar también el runtime SAM 2 y su checkpoint.
 
+## Distribución Windows
+
+`scripts/build-windows-lite.ps1` produce dos ediciones locales con PyInstaller: `Lite` incluye inspección, UV, reportes y Blender; `AI` añade las dependencias de visión. Ninguna incluye modelos ni los descarga. `Lite` excluye PyTorch, Transformers y CUDA para reducir tamaño.
+
 ## Herramientas empleadas
 
-- Python 3.11+ y Typer/Rich para la CLI.
+- Python 3.11, 3.12 o 3.13 y Typer/Rich para la CLI.
 - NumPy, OpenCV y Pillow para máscaras, recortes y contact sheets.
 - PSD Tools para PSD editables.
 - PyTorch, SAM 2 y CUDA opcional para segmentación.

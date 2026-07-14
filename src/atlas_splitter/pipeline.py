@@ -14,6 +14,7 @@ from atlas_splitter.io.psd_writer import write_element_psd
 from atlas_splitter.processing.deduplicate import deduplicate_masks
 from atlas_splitter.processing.mask_cleanup import cleanup_masks
 from atlas_splitter.reporting.contact_sheet import write_contact_sheet
+from atlas_splitter.reporting.html_report import generate_html_report
 from atlas_splitter.reporting.manifest import write_manifest
 from atlas_splitter.segmentation.classical import MaskCandidate
 from atlas_splitter.segmentation.hybrid import segment_hybrid
@@ -96,6 +97,7 @@ def process_image(path: Path, output_root: Path, config: AppConfig, sam_engine: 
             perf_counter() - started,
             getattr(sam_engine, "runtime_device", "cpu"),
         )
+        generate_html_report(destination)
     except (Exception, KeyboardInterrupt):
         for item in sorted(destination.rglob("*"), reverse=True):
             if item.is_file():

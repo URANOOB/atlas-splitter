@@ -186,7 +186,10 @@ def _organize_semantic_output(
             shutil.copy2(piece.png_path, target)
             copied.append(str(target.relative_to(destination)))
             assigned.add(piece_id)
-        artifacts[group.group_id]["pieces"] = copied
+        # Los artefactos de los grupos aceptados e inciertos se preparan antes
+        # de esta fase. ``setdefault`` conserva además la operación segura si
+        # este organizador se reutiliza con un resultado ya materializado.
+        artifacts.setdefault(group.group_id, {})["pieces"] = copied
     unassigned = destination / "unassigned"
     unassigned.mkdir(exist_ok=True)
     rejected_piece_ids = (

@@ -63,9 +63,9 @@ class Sam2Engine:
         from sam2.build_sam import build_sam2  # type: ignore[import-not-found]
 
         spec = get_model(self.model_name)
-        selected_device = resolve_device(self.device)
-        model = build_sam2(spec.config_name, str(checkpoint_path(self.model_name)), device=selected_device)
-        self._runtime_device = selected_device
+        resolution = resolve_device(self.device)
+        model = build_sam2(spec.config_name, str(checkpoint_path(self.model_name)), device=resolution.selected)
+        self._runtime_device = resolution.selected
         self._generator = SAM2AutomaticMaskGenerator(
             model,
             points_per_side=self.points_per_side,

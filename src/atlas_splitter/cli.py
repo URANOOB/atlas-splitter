@@ -1,5 +1,6 @@
 """Interfaz de línea de comandos de atlas-splitter."""
 
+import json
 import logging
 import sys
 from pathlib import Path
@@ -16,20 +17,23 @@ from atlas_splitter.blender.script_writer import (
     write_object_rebuild_script,
     write_single_object_rebuild_script,
 )
-from atlas_splitter.config import apply_cli_overrides, load_config
+from atlas_splitter.config import GroupingConfig, apply_cli_overrides, load_config
 from atlas_splitter.diagnostics import collect_diagnostics, has_critical_failures
 from atlas_splitter.domain import slugify
 from atlas_splitter.exceptions import (
     AtlasSplitterError,
     GltfLoadError,
     InputValidationError,
+    InvalidReviewError,
     PrimitiveDecodeError,
     SemanticInferenceError,
     SemanticModelUnavailableError,
 )
 from atlas_splitter.geometry.glb_exporter import GroupBy, export_glb
 from atlas_splitter.geometry.glb_loader import load_gltf
+from atlas_splitter.geometry.model_inspector import inspect_model
 from atlas_splitter.geometry.object_grouping import ExportedAtlas, write_object_manifest
+from atlas_splitter.geometry.project_writer import write_project_manifest
 from atlas_splitter.geometry.texture_association import load_atlas_bindings, resolve_external_atlases
 from atlas_splitter.installer import InstallationError, create_isolated_environment, install_runtime
 from atlas_splitter.io.image_loader import ImageLoadError, discover_images
@@ -38,6 +42,8 @@ from atlas_splitter.models.manager import download_model as fetch_model
 from atlas_splitter.models.manager import is_downloaded
 from atlas_splitter.models.registry import MODELS, get_model
 from atlas_splitter.pipeline import process_image
+from atlas_splitter.reporting.html_report import generate_html_report
+from atlas_splitter.review import apply_review, create_review_template
 from atlas_splitter.segmentation.sam2_engine import Sam2Engine
 from atlas_splitter.semantic.grouping_service import group_extracted_atlas
 from atlas_splitter.semantic.qwen3_vl_engine import Qwen3VLSemanticGroupingBackend
@@ -141,9 +147,19 @@ def _prompt_existing_path(
 
 
 @app.command()
-def doctor() -> None:
+def doctor(format: Annotated[str, typer.Option("--format", help="text o json")] = "text") -> None:
     """Comprueba los requisitos locales sin descargar ni modificar nada."""
     checks = collect_diagnostics()
+    if format == "json":
+        payload = [{"name": item.name, "ok": item.ok, "status": item.status, "detail": item.detail} for item in checks]
+        console.print_json(
+            json.dumps(payload)
+        )
+        if has_critical_failures(checks):
+            raise typer.Exit(code=1)
+        return
+    if format != "text":
+        raise typer.BadParameter("--format debe ser text o json")
     table = Table(title="atlas-split doctor")
     table.add_column("Comprobación")
     table.add_column("Estado")
@@ -173,6 +189,7 @@ def glb(
     texture_index: Annotated[int | None, typer.Option(help="Índice de textura a usar")] = None,
     texture_slot: Annotated[str, typer.Option(help="Mapa de material a extraer")] = "baseColor",
     group_by: Annotated[str, typer.Option(help="node, mesh, primitive o uv-island")] = "uv-island",
+    uv_tolerance: Annotated[float, typer.Option(help="Tolerancia para comparar extremos de aristas UV")] = 1e-6,
     allow_unbound_atlas: Annotated[
         bool,
         typer.Option("--allow-unbound-atlas", help="Confirma una asociación manual para GLB sin materiales"),
@@ -184,6 +201,8 @@ def glb(
     """Exporta regiones UV y materiales de un GLB/glTF enteramente local."""
     if group_by not in {"node", "mesh", "primitive", "uv-island"}:
         raise typer.BadParameter(str(InputValidationError("--group-by debe ser node, mesh, primitive o uv-island")))
+    if uv_tolerance <= 0:
+        raise typer.BadParameter(str(InputValidationError("--uv-tolerance debe ser mayor que cero")))
     if texture_slot not in {"baseColor", "normal", "metallicRoughness", "occlusion", "emissive"}:
         raise typer.BadParameter("--texture-slot no es válido")
     if atlas is not None and not atlas.is_file():
@@ -198,7 +217,7 @@ def glb(
             associations = (
                 load_atlas_bindings(bindings, loaded)
                 if bindings is not None
-                else resolve_external_atlases(loaded, _required_atlas_directory(atlas_dir))
+                else resolve_external_atlases(loaded, _required_atlas_directory(atlas_dir), texture_slot)
             )
             exported_atlases = [
                 ExportedAtlas(
@@ -209,25 +228,29 @@ def glb(
                         output / association.atlas_path.stem,
                         atlas=association.atlas_path,
                         texture_index=texture_index,
-                        texture_slot=texture_slot,
+                        image_index=association.image_index,
+                        texture_slot=association.texture_slot,
                         group_by=cast(GroupBy, group_by),
                         allow_unbound_atlas=allow_unbound_atlas or association.manual_confirmation,
                         node_indices=set(association.node_indices),
                         flip_v=association.flip_v if bindings is not None else flip_v,
                         uv_set=association.uv_set,
                         force_external_atlas=association.manual_confirmation,
+                        uv_tolerance=uv_tolerance,
                     ),
                     flip_v=association.flip_v if bindings is not None else flip_v,
                     association_method=association.method,
                     association_confidence=association.confidence,
                     manual_confirmation=association.manual_confirmation,
                     uv_set=association.uv_set,
+                    texture_slot=association.texture_slot,
                 )
                 for association in associations
             ]
             object_manifest = write_object_manifest(
                 output / "objects_manifest.json", loaded.source_path, exported_atlases
             )
+            write_project_manifest(output / "project.json", loaded.source_path, exported_atlases)
             write_object_rebuild_script(
                 output / "blender" / "rebuild_scene.py", loaded.source_path, output / "objects_manifest.json"
             )
@@ -260,6 +283,7 @@ def glb(
                 group_by=cast(GroupBy, group_by),
                 allow_unbound_atlas=allow_unbound_atlas,
                 flip_v=flip_v,
+                uv_tolerance=uv_tolerance,
             )
             element_count = len(manifest.elements)
     except (GltfLoadError, PrimitiveDecodeError, OSError, ValueError) as error:
@@ -277,6 +301,70 @@ def _required_atlas_directory(value: Path | None) -> Path:
     if value is None:
         raise ValueError("Se requiere un directorio de atlas para la asociacion automatica.")
     return value
+
+
+@app.command()
+def extract(
+    model: Annotated[Path, typer.Argument(help="Modelo GLB o glTF")],
+    atlas: Annotated[Path | None, typer.Option(help="Atlas opcional si no está embebido")] = None,
+    output: Annotated[Path, typer.Option(help="Carpeta de salida")] = Path("outputs"),
+) -> None:
+    """Atajo sencillo para extraer regiones UV exactas de un modelo."""
+    glb(model=model, atlas=atlas, output=output)
+
+
+@app.command()
+def preview(output: Annotated[Path, typer.Argument(help="Directorio de una ejecución existente")]) -> None:
+    """Regenera el reporte HTML local de una extracción visual ya terminada."""
+    try:
+        report = generate_html_report(output)
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        raise typer.BadParameter(str(error), param_hint="output") from error
+    console.print(f"[green]Reporte local:[/green] {report}")
+
+
+@app.command("review")
+def review(output: Annotated[Path, typer.Argument(help="Directorio de una ejecución existente")]) -> None:
+    """Crea la plantilla review.json sin ejecutar inferencia otra vez."""
+    try:
+        template = create_review_template(output)
+    except InvalidReviewError as error:
+        raise typer.BadParameter(str(error), param_hint="output") from error
+    console.print(f"[green]Revisión creada:[/green] {template}")
+
+
+@app.command("apply-review")
+def apply_manual_review(review_file: Annotated[Path, typer.Argument(help="Archivo review.json editable")]) -> None:
+    """Aplica grupos manuales sin modificar los PNG ni las máscaras originales."""
+    try:
+        applied = apply_review(review_file)
+    except InvalidReviewError as error:
+        raise typer.BadParameter(str(error), param_hint="review_file") from error
+    console.print(f"[green]Revisión aplicada:[/green] {applied}")
+
+
+@app.command()
+def group(
+    output: Annotated[Path, typer.Argument(help="Directorio visual ya extraído")],
+    device: Annotated[str, typer.Option(help="auto, cpu, cuda o mps")] = "auto",
+) -> None:
+    """Agrupa una extracción existente con el modelo local, sin reprocesar el atlas."""
+    if not is_semantic_model_downloaded("qwen3-vl-2b"):
+        raise typer.BadParameter("Qwen3-VL local no está instalado; usa semantic-models download explícitamente.")
+    try:
+        config = GroupingConfig.model_validate({"enabled": True, "device": device})
+    except ValidationError as error:
+        raise typer.BadParameter(str(error), param_hint="--device") from error
+    backend = Qwen3VLSemanticGroupingBackend(
+        config.model, config.device, config.minimum_confidence, config.automatic_confidence
+    )
+    try:
+        group_extracted_atlas(output, config, backend)
+    except (SemanticInferenceError, SemanticModelUnavailableError, OSError, ValueError) as error:
+        raise typer.BadParameter(str(error), param_hint="output") from error
+    finally:
+        backend.close()
+    console.print(f"[green]Agrupación creada:[/green] {output / 'semantic_manifest.json'}")
 
 
 @app.command()
@@ -363,7 +451,7 @@ def run(
         bool | None, typer.Option("--auto-group/--no-auto-group", help="Agrupar piezas semánticamente")
     ] = None,
     semantic_model: Annotated[str | None, typer.Option(help="Modelo semántico local")] = None,
-    semantic_device: Annotated[str | None, typer.Option(help="auto, cpu o cuda para el modelo semántico")] = None,
+    semantic_device: Annotated[str | None, typer.Option(help="auto, cpu, cuda o mps para el modelo semántico")] = None,
     group_confidence: Annotated[float | None, typer.Option(help="Confianza mínima de agrupación")] = None,
     auto_group_confidence: Annotated[float | None, typer.Option(help="Confianza para aceptación automática")] = None,
     max_pieces_per_sheet: Annotated[int | None, typer.Option(help="Máximo de piezas por hoja semántica")] = None,
@@ -463,9 +551,21 @@ def run(
             raise typer.Exit(code=1) from error
 
 
+@app.command()
+def split(
+    atlas: Annotated[Path, typer.Argument(help="Atlas de texturas local")],
+    output: Annotated[Path | None, typer.Option(help="Carpeta de salida")] = None,
+) -> None:
+    """Atajo sencillo para separar visualmente un atlas sin geometría."""
+    run(source=atlas, output=output)
+
+
 def translate_simple_args(arguments: list[str]) -> list[str]:
     """Traduce ``atlas-splitter archivo [salida]`` a la interfaz avanzada."""
-    commands = {"doctor", "glb", "install", "inspect", "models", "semantic", "semantic-3d", "semantic-models", "run"}
+    commands = {
+        "apply-review", "doctor", "extract", "glb", "group", "install", "inspect", "models", "preview",
+        "review", "semantic", "semantic-3d", "semantic-models", "run", "split",
+    }
     if not arguments or arguments[0] in commands or arguments[0].startswith("-"):
         return arguments
     translated = ["run", arguments[0]]
@@ -575,13 +675,44 @@ def download_registered_semantic_model(
 
 
 @app.command()
-def inspect(archive: Annotated[Path, typer.Argument(help="ZIP generado por atlas-split")]) -> None:
-    """Muestra los manifiestos contenidos en un ZIP de resultados."""
+def inspect(
+    source: Annotated[Path, typer.Argument(help="Modelo GLB/glTF local o ZIP heredado de atlas-split")],
+    format: Annotated[str, typer.Option("--format", help="text o json (sólo para GLB/glTF)")] = "text",
+) -> None:
+    """Inspecciona un modelo GLB/glTF; los ZIP antiguos conservan su vista heredada."""
     import json
     import zipfile
 
+    if format not in {"text", "json"}:
+        raise typer.BadParameter("--format debe ser text o json")
+    if source.suffix.lower() in {".glb", ".gltf"}:
+        try:
+            inspection = inspect_model(load_gltf(source))
+        except (GltfLoadError, OSError, ValueError) as error:
+            raise typer.BadParameter(str(error), param_hint="source") from error
+        if format == "json":
+            console.print_json(inspection.model_dump_json(indent=2))
+            return
+        console.print(f"Archivo: {inspection.file}")
+        console.print(f"Nodos: {inspection.nodes}")
+        console.print(f"Mallas: {inspection.meshes}")
+        console.print(f"Primitivas: {inspection.primitives}")
+        console.print(f"Materiales: {inspection.materials}")
+        console.print(f"Texturas: {inspection.textures}")
+        console.print(f"UV sets disponibles: {', '.join(inspection.uv_sets) or 'ninguno'}")
+        console.print(f"Animaciones: {inspection.animations}")
+        console.print(f"Compresión Draco: {'sí' if inspection.draco_compression else 'no'}")
+        for number, candidate in enumerate(inspection.candidates, start=1):
+            console.print(f"\n[{number}] Nodo: {candidate.node_name} ({candidate.node_index})")
+            console.print(f"    Malla: {candidate.mesh_index}")
+            console.print(f"    Primitivas: {candidate.primitive_count}")
+            console.print(f"    Materiales: {', '.join(candidate.material_names) or 'ninguno'}")
+            console.print(f"    UV: {', '.join(candidate.uv_sets) or 'ninguno'}")
+        return
+    if format != "text":
+        raise typer.BadParameter("--format json requiere un archivo GLB o glTF", param_hint="source")
     try:
-        with zipfile.ZipFile(archive) as contents:
+        with zipfile.ZipFile(source) as contents:
             manifests = [name for name in contents.namelist() if name.endswith("manifest.json")]
             if not manifests:
                 raise ValueError("El ZIP no contiene manifest.json")
@@ -589,4 +720,4 @@ def inspect(archive: Annotated[Path, typer.Argument(help="ZIP generado por atlas
                 manifest = json.loads(contents.read(name))
                 console.print(f"{name}: {manifest['final_elements']} elementos; fuente {manifest['source_file']}")
     except (OSError, ValueError, zipfile.BadZipFile, KeyError) as error:
-        raise typer.BadParameter(str(error), param_hint="archive") from error
+        raise typer.BadParameter(str(error), param_hint="source") from error

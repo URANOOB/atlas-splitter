@@ -42,7 +42,15 @@ def test_yaml_bindings_resolve_names_and_record_manual_confirmation(tmp_path: Pa
     atlas = tmp_path / "custom.webp"
     atlas.touch()
     bindings = tmp_path / "bindings.yaml"
-    bindings.write_text("atlas_bindings:\n  - atlas: custom.webp\n    nodes: [Roof]\n    uv_set: 1\n    flip_v: true\n")
+    bindings.write_text(
+        "version: 1\n"
+        "atlas_bindings:\n"
+        "  - atlas: custom.webp\n"
+        "    nodes: [Roof]\n"
+        "    texture_slot: normal\n"
+        "    uv_set: 1\n"
+        "    flip_v: true\n"
+    )
     loaded = SimpleNamespace(document=SimpleNamespace(nodes=[SimpleNamespace(name="Roof")]))
 
     result = load_atlas_bindings(bindings, loaded)
@@ -53,6 +61,7 @@ def test_yaml_bindings_resolve_names_and_record_manual_confirmation(tmp_path: Pa
     assert result[0].manual_confirmation is True
     assert result[0].uv_set == 1
     assert result[0].flip_v is True
+    assert result[0].texture_slot == "normal"
 
 
 def test_yaml_bindings_reject_ambiguous_node_names(tmp_path: Path) -> None:
@@ -78,7 +87,9 @@ def test_automatic_name_ambiguity_is_rejected_safely(tmp_path: Path, monkeypatch
         resolve_external_atlases(loaded, tmp_path)
 
 
-def test_automatic_association_records_material_name_evidence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_automatic_association_records_normalized_name_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     (tmp_path / "brick-wall.webp").touch()
     loaded = SimpleNamespace(
         document=SimpleNamespace(images=[SimpleNamespace(uri="brick_wall.png")], nodes=[])
@@ -88,8 +99,8 @@ def test_automatic_association_records_material_name_evidence(tmp_path: Path, mo
     result = resolve_external_atlases(loaded, tmp_path)
 
     assert result[0].atlas_path == (tmp_path / "brick-wall.webp").resolve()
-    assert result[0].method == "material_name"
-    assert result[0].confidence == 0.90
+    assert result[0].method == "normalized_name"
+    assert result[0].confidence == 0.70
     assert result[0].node_indices == frozenset({2})
 
 
@@ -104,3 +115,17 @@ def test_automatic_association_records_hash_evidence(tmp_path: Path, monkeypatch
     assert result[0].method == "image_hash"
     assert result[0].confidence == 0.99
     assert result[0].node_indices == frozenset({3})
+
+
+def test_automatic_association_prefers_hash_over_a_matching_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "wall-basecolor.webp").touch()
+    loaded = SimpleNamespace(document=SimpleNamespace(images=[SimpleNamespace(uri="wall.png")], nodes=[]))
+    monkeypatch.setattr("atlas_splitter.geometry.texture_association._matching_image_indices", lambda *_: [0])
+    monkeypatch.setattr("atlas_splitter.geometry.texture_association._nodes_using_image", lambda *_: {4})
+
+    result = resolve_external_atlases(loaded, tmp_path)
+
+    assert result[0].method == "image_hash"
+    assert result[0].confidence == 0.99

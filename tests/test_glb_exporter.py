@@ -119,6 +119,55 @@ def test_flips_only_the_v_coordinate_for_confirmed_external_atlas() -> None:
     assert _flip_v(np.array([[0.25, 0.0], [0.75, 1.0]])).tolist() == [[0.25, 1.0], [0.75, 0.0]]
 
 
+def test_image_index_filters_a_multiatlas_node_to_its_declared_material(tmp_path: Path) -> None:
+    for name, color in (("wall.png", (255, 0, 0, 255)), ("roof.png", (0, 0, 255, 255))):
+        Image.new("RGBA", (8, 8), color).save(tmp_path / name)
+    positions = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0]], dtype="<f4").tobytes()
+    texcoords = np.array([[0, 0], [1, 0], [0, 1]], dtype="<f4").tobytes()
+    indices = np.array([0, 1, 2], dtype="<u2").tobytes()
+    payload = positions + texcoords + indices
+    (tmp_path / "mesh.bin").write_bytes(payload)
+    model = tmp_path / "multiatlas.gltf"
+    model.write_text(
+        json.dumps(
+            {
+                "asset": {"version": "2.0"},
+                "buffers": [{"uri": "mesh.bin", "byteLength": len(payload)}],
+                "bufferViews": [
+                    {"buffer": 0, "byteOffset": 0, "byteLength": len(positions)},
+                    {"buffer": 0, "byteOffset": len(positions), "byteLength": len(texcoords)},
+                    {"buffer": 0, "byteOffset": len(positions) + len(texcoords), "byteLength": len(indices)},
+                ],
+                "accessors": [
+                    {"bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3"},
+                    {"bufferView": 1, "componentType": 5126, "count": 3, "type": "VEC2"},
+                    {"bufferView": 2, "componentType": 5123, "count": 3, "type": "SCALAR"},
+                ],
+                "images": [{"uri": "wall.png"}, {"uri": "roof.png"}],
+                "textures": [{"source": 0}, {"source": 1}],
+                "materials": [
+                    {"pbrMetallicRoughness": {"baseColorTexture": {"index": 0}}},
+                    {"pbrMetallicRoughness": {"baseColorTexture": {"index": 1}}},
+                ],
+                "meshes": [{"primitives": [
+                    {"attributes": {"POSITION": 0, "TEXCOORD_0": 1}, "indices": 2, "material": 0},
+                    {"attributes": {"POSITION": 0, "TEXCOORD_0": 1}, "indices": 2, "material": 1},
+                ]}],
+                "nodes": [{"mesh": 0}],
+                "scenes": [{"nodes": [0]}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    loaded = load_gltf(model)
+
+    wall = export_glb(loaded, tmp_path / "wall-output", atlas=tmp_path / "wall.png", image_index=0)
+    roof = export_glb(loaded, tmp_path / "roof-output", atlas=tmp_path / "roof.png", image_index=1)
+
+    assert [element.material_index for element in wall.elements] == [0]
+    assert [element.material_index for element in roof.elements] == [1]
+
+
 def test_group_by_modes_produce_distinct_deterministic_element_counts(tmp_path: Path) -> None:
     image_path = tmp_path / "paint.png"
     Image.new("RGBA", (16, 16), (200, 20, 10, 255)).save(image_path)
@@ -161,11 +210,16 @@ def test_group_by_modes_produce_distinct_deterministic_element_counts(tmp_path: 
         encoding="utf-8",
     )
     loaded = load_gltf(model)
-    counts = {
-        mode: len(export_glb(loaded, tmp_path / mode, group_by=mode).elements)
+    manifests = {
+        mode: export_glb(loaded, tmp_path / mode, group_by=mode)
         for mode in ("node", "mesh", "primitive", "uv-island")
     }
+    counts = {mode: len(manifest.elements) for mode, manifest in manifests.items()}
     assert counts == {"node": 2, "mesh": 1, "primitive": 4, "uv-island": 8}
+    assert all(element.group_by == mode for mode, manifest in manifests.items() for element in manifest.elements)
+    mesh_sources = manifests["mesh"].elements[0].source_primitives
+    assert len(mesh_sources) == 4
+    assert all("node_transform" in source for source in mesh_sources)
 
 
 def test_node_group_keeps_regions_and_auxiliary_maps_per_material(tmp_path: Path) -> None:

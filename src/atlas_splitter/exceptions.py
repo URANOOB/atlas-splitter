@@ -39,8 +39,8 @@ class DeviceResolutionError(AtlasSplitterError):
     """El dispositivo solicitado no puede usarse en este equipo."""
 
     code = "AS-MODEL-003"
-    probable_cause = "CUDA no esta disponible o el dispositivo indicado no es valido."
-    solution = "Use --device auto o --device cpu, o instale PyTorch compatible con CUDA."
+    probable_cause = "CUDA o MPS no estan disponibles, o el dispositivo indicado no es valido."
+    solution = "Use --device auto o --device cpu, o instale PyTorch compatible con el acelerador solicitado."
 
 
 class Sam2InferenceError(AtlasSplitterError):
@@ -81,3 +81,11 @@ class DracoDecoderUnavailableError(PrimitiveDecodeError):
 
 class DracoDecodeError(PrimitiveDecodeError):
     """El decodificador local Draco rechazo una primitiva comprimida."""
+
+
+class InvalidReviewError(AtlasSplitterError):
+    """La revisión manual no cubre las piezas de forma segura."""
+
+    code = "AS-REVIEW-001"
+    probable_cause = "Hay piezas inexistentes, duplicadas o sin asignar en review.json."
+    solution = "Incluya cada pieza exactamente una vez y use nombres de grupo seguros."
