@@ -58,15 +58,20 @@ Usa `--device auto` para escoger CUDA, MPS o CPU de forma segura; `--device cpu`
 ## Comandos directos
 
 ```text
-atlas-splitter atlas.webp resultados
-atlas-splitter run ./atlases --recursive --output resultados --calibration-pixels 4
-atlas-splitter glb modelo.glb --atlas-dir ./atlases --output resultados
+atlas-splitter split atlas.webp --output resultados
+atlas-splitter extract modelo.glb --atlas atlas.webp --output resultados
+atlas-splitter group resultados/atlas
+atlas-splitter review resultados/atlas
+atlas-splitter apply-review resultados/atlas/review.json
+atlas-splitter preview resultados/atlas
 atlas-splitter inspect modelo.glb
 atlas-splitter inspect modelo.gltf --format json
-atlas-splitter doctor
+atlas-splitter doctor --format json
 atlas-splitter models list
 atlas-splitter semantic-models list
 ```
+
+`split` usa recuperación visual aproximada. `extract` usa UV exactas cuando el modelo las incluye. `group` no descarga Qwen3-VL: solicita que esté instalado localmente. Usa `review` y `apply-review` para corregir grupos sin volver a procesar el atlas.
 
 ## Instalación aislada
 
