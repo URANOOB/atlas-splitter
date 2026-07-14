@@ -85,7 +85,7 @@ def export_glb(
         if binding.texcoord not in primitive.texcoords:
             raise PrimitiveDecodeError(f"La primitiva {primitive.reference} no contiene TEXCOORD_{binding.texcoord}.")
         uvs = primitive.texcoords[binding.texcoord]
-        groups = _groups(primitive.triangle_indices, group_by)
+        groups = _groups(primitive.triangle_indices, group_by, uvs)
         for group_index, triangle_rows in enumerate(groups):
             triangles = primitive.triangle_indices[triangle_rows]
             transformed = _flip_v(binding.transform.apply(uvs)) if flip_v else binding.transform.apply(uvs)
@@ -205,8 +205,8 @@ def _flip_v(uvs: np.ndarray) -> np.ndarray:
     return flipped
 
 
-def _groups(triangles: np.ndarray, group_by: GroupBy) -> list[np.ndarray]:
-    return uv_island_triangle_groups(triangles) if group_by == "uv-island" else [np.arange(len(triangles), dtype=np.int64)]
+def _groups(triangles: np.ndarray, group_by: GroupBy, uvs: np.ndarray) -> list[np.ndarray]:
+    return uv_island_triangle_groups(triangles, uvs) if group_by == "uv-island" else [np.arange(len(triangles), dtype=np.int64)]
 
 
 def _element(loaded, primitive, binding, key, uvs, transformed, triangles, triangle_rows, region) -> AtlasElement:  # type: ignore[no-untyped-def]
