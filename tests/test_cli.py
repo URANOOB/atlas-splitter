@@ -104,6 +104,8 @@ def test_install_help_is_available_without_installing_dependencies() -> None:
     result = runner.invoke(app, ["install", "--help"])
     assert result.exit_code == 0
     assert "virtualenv" in result.stdout
+    assert "--profile" in result.stdout
+    assert "--yes" in result.stdout
 
 
 def test_interactive_atlas_mode_returns_simple_reproducible_run_args(tmp_path, monkeypatch) -> None:

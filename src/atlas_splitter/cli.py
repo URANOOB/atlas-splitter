@@ -500,13 +500,21 @@ def main() -> None:
 def install(
     model: Annotated[str | None, typer.Option(help="Checkpoint SAM 2 opcional")] = None,
     environment: Annotated[Path, typer.Option(help="Ruta del virtualenv aislado")] = Path(".atlas-splitter-venv"),
+    profile: Annotated[str, typer.Option(help="basic, geometry, semantic o all")] = "basic",
+    yes: Annotated[bool, typer.Option("--yes", help="Confirma una descarga de modelo solicitada")] = False,
 ) -> None:
     """Crea un entorno aislado local; no modifica el Python global."""
     console.print("Creando entorno aislado de atlas-splitter...")
     try:
-        target = create_isolated_environment(Path.cwd(), environment)
+        target = create_isolated_environment(Path.cwd(), environment, profile)
         if model is not None:
-            checkpoint = install_runtime(model)
+            if not yes and not typer.confirm(
+                f"Esto descargará SAM 2 y el checkpoint '{model}' dentro del entorno aislado. ¿Continuar?",
+                default=False,
+            ):
+                raise InstallationError("Descarga de modelo cancelada por la persona usuaria.")
+            python = target / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
+            checkpoint = install_runtime(model, python)
             console.print(f"[green]Checkpoint disponible:[/green] {checkpoint}")
     except (InstallationError, OSError, ValueError) as error:
         raise typer.BadParameter(str(error), param_hint="--environment") from error
