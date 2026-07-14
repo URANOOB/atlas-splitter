@@ -48,6 +48,7 @@ def export_glb(
     *,
     atlas: Path | None = None,
     texture_index: int | None = None,
+    image_index: int | None = None,
     texture_slot: str = "baseColor",
     group_by: GroupBy = "uv-island",
     allow_unbound_atlas: bool = False,
@@ -65,7 +66,7 @@ def export_glb(
     for primitive in primitives:
         if node_indices is not None and primitive.reference.node_index not in node_indices:
             continue
-        binding = _primary_binding(loaded, primitive.reference.material_index, texture_slot, texture_index)
+        binding = _primary_binding(loaded, primitive.reference.material_index, texture_slot, texture_index, image_index)
         manual_atlas = selected_atlas is not None and (force_external_atlas or (binding is None and allow_unbound_atlas))
         if manual_atlas:
             binding = TextureBinding(
@@ -272,14 +273,24 @@ def _combined_mask(destination: Path, members: list[AtlasElement]) -> tuple[np.n
     return mask, (x, y, int(columns.max()) - x + 1, int(rows.max()) - y + 1)
 
 
-def _primary_binding(loaded: LoadedGltf, material_index: int | None, slot: str, texture_index: int | None) -> TextureBinding | None:
+def _primary_binding(
+    loaded: LoadedGltf,
+    material_index: int | None,
+    slot: str,
+    texture_index: int | None,
+    image_index: int | None,
+) -> TextureBinding | None:
     if material_index is None:
         return None
     bindings = [item for item in material_texture_bindings(loaded, material_index) if item.slot == slot]
     if texture_index is not None:
         bindings = [item for item in bindings if item.texture_index == texture_index]
+    if image_index is not None:
+        bindings = [item for item in bindings if item.image_index == image_index]
     if len(bindings) > 1:
-        raise GltfLoadError(f"El material {material_index} tiene asociaciones ambiguas para {slot}; use --texture-index.")
+        raise GltfLoadError(
+            f"El material {material_index} tiene asociaciones ambiguas para {slot}; use --texture-index."
+        )
     return bindings[0] if bindings else None
 
 

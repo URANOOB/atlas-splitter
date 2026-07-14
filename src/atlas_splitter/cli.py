@@ -214,6 +214,7 @@ def glb(
                         output / association.atlas_path.stem,
                         atlas=association.atlas_path,
                         texture_index=texture_index,
+                        image_index=association.image_index,
                         texture_slot=association.texture_slot,
                         group_by=cast(GroupBy, group_by),
                         allow_unbound_atlas=allow_unbound_atlas or association.manual_confirmation,
