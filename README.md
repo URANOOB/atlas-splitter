@@ -1,6 +1,6 @@
 # Atlas Splitter
 
-[![CI](https://github.com/URANOOB/atlas-splitter/actions/workflows/ci.yml/badge.svg)](https://github.com/URANOOB/atlas-splitter/actions/workflows/ci.yml) [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](pyproject.toml) [![Ruff](https://img.shields.io/badge/lint-Ruff-261230)](https://docs.astral.sh/ruff/) [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![CI](https://github.com/URANOOB/atlas-splitter/actions/workflows/ci.yml/badge.svg)](https://github.com/URANOOB/atlas-splitter/actions/workflows/ci.yml) [![Python](https://img.shields.io/badge/python-3.11--3.13-blue)](pyproject.toml) [![Ruff](https://img.shields.io/badge/lint-Ruff-261230)](https://docs.astral.sh/ruff/) [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 > Convierte atlas de texturas en piezas editables mediante segmentación 2D o coordenadas UV exactas de GLB/glTF. Todo el procesamiento es local.
 
@@ -106,7 +106,7 @@ En macOS/Linux y Windows se usa el mismo ejecutable: `atlas-splitter`. Añade `a
 
 ## Herramientas empleadas
 
-- Python 3.11+ y Typer/Rich para la CLI.
+- Python 3.11, 3.12 o 3.13 y Typer/Rich para la CLI.
 - NumPy, OpenCV y Pillow para máscaras, recortes y contact sheets.
 - PSD Tools para PSD editables.
 - PyTorch, SAM 2 y CUDA opcional para segmentación.
