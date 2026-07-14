@@ -1,3 +1,5 @@
+import re
+
 from typer.testing import CliRunner
 
 from atlas_splitter.cli import app, interactive_arguments, translate_simple_args
@@ -109,7 +111,9 @@ def test_glb_option_validation_uses_a_stable_cli_code(tmp_path) -> None:
 def test_glb_rejects_a_non_positive_uv_tolerance(tmp_path) -> None:
     result = runner.invoke(app, ["glb", str(tmp_path / "model.gltf"), "--uv-tolerance", "0"])
     assert result.exit_code != 0
-    assert "--uv-tolerance debe ser mayor que cero" in result.stderr
+    plain_stderr = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", result.stderr)
+    normalized_stderr = " ".join(plain_stderr.split())
+    assert "--uv-tolerance debe ser mayor que cero" in normalized_stderr
 
 
 def test_run_rejects_a_missing_source(tmp_path) -> None:
