@@ -53,7 +53,7 @@ segmentation:
   sam2_edge_padding: 4
 ```
 
-Usa `--device auto` para escoger CUDA cuando esté disponible o CPU de forma segura; `--device cpu` fuerza CPU.
+Usa `--device auto` para escoger CUDA, MPS o CPU de forma segura; `--device cpu` fuerza CPU.
 
 ## Comandos directos
 
@@ -61,6 +61,8 @@ Usa `--device auto` para escoger CUDA cuando esté disponible o CPU de forma seg
 atlas-splitter atlas.webp resultados
 atlas-splitter run ./atlases --recursive --output resultados --calibration-pixels 4
 atlas-splitter glb modelo.glb --atlas-dir ./atlases --output resultados
+atlas-splitter inspect modelo.glb
+atlas-splitter inspect modelo.gltf --format json
 atlas-splitter doctor
 atlas-splitter models list
 atlas-splitter semantic-models list
@@ -73,6 +75,8 @@ La forma recomendada crea el entorno y dependencias sin tocar el Python global:
 ```text
 atlas-splitter install
 ```
+
+`inspect` no altera el modelo y muestra nodos, mallas, primitivas, materiales, UV sets, animaciones, Draco y candidatos de extracción. Con `--atlas-dir`, la asociación automática primero compara el contenido RGBA y dimensiones, y sólo usa nombres normalizados como evidencia de menor confianza. Si hay ambigüedad, proporciona `--bindings`.
 
 También puedes crear un entorno del proyecto sin tocar Python global:
 
