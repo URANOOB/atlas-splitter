@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Atlas Splitter visual manifest",
+  "type": "object",
+  "required": ["schema_version", "source_file", "elements"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "tool_version": {"type": "string"},
+    "source_file": {"type": "string"},
+    "elements": {"type": "array", "items": {"type": "object", "required": ["png", "mask"]}}
+  }
+}

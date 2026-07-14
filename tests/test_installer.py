@@ -5,7 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from atlas_splitter.installer import InstallationError, create_isolated_environment, install_optional_components
+from atlas_splitter.installer import (
+    InstallationError,
+    build_optional_install_command,
+    create_isolated_environment,
+    install_optional_components,
+)
 
 
 def test_installation_rejects_an_unknown_profile_before_creating_a_venv(tmp_path: Path) -> None:
@@ -35,3 +40,19 @@ def test_optional_install_uses_installed_package_not_the_current_directory(monke
     install_optional_components("geometry", Path("python"))
 
     assert calls == [["python", "-m", "pip", "install", "atlas-splitter[geometry]"]]
+
+
+def test_ai_install_command_uses_standard_wheels_without_cuda_pin(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("atlas_splitter.installer.version", lambda _name: "0.2.0")
+
+    command = build_optional_install_command("ai", device="cpu", python_executable=Path("python"))
+
+    assert command == ["python", "-m", "pip", "install", "atlas-splitter[vision,semantic]"]
+    assert "cu121" not in " ".join(command)
+
+
+def test_mps_is_rejected_outside_macos(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("atlas_splitter.installer.version", lambda _name: "0.2.0")
+
+    with pytest.raises(InstallationError, match="MPS"):
+        build_optional_install_command("ai", device="mps", system="Windows")

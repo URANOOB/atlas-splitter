@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Atlas Splitter review",
+  "type": "object",
+  "required": ["version", "groups", "unassigned_piece_ids"],
+  "properties": {
+    "version": {"const": 1},
+    "source": {"type": "string"},
+    "groups": {"type": "array"},
+    "unassigned_piece_ids": {"type": "array", "items": {"type": "string"}}
+  }
+}

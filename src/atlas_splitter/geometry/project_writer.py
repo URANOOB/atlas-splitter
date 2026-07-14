@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
+from atlas_splitter import __version__
 from atlas_splitter.domain import ProjectAtlas, ProjectManifest, slugify, write_versioned_manifest
 from atlas_splitter.geometry.object_grouping import ExportedAtlas
 
@@ -25,7 +26,7 @@ def write_project_manifest(destination: Path, source_model: Path, atlases: list[
         for atlas in atlases
     ]
     manifest = ProjectManifest(
-        tool_version="0.1.0",
+        tool_version=__version__,
         created_at=datetime.now(UTC).isoformat(),
         source_files=[str(source_model.resolve()), *[item.source_file for item in records]],
         warnings=["Las asociaciones de atlas conservan su método y confianza; no se infirieron asociaciones ambiguas."],

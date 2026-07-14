@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from atlas_splitter.semantic_models.registry import get_semantic_model
@@ -9,7 +10,10 @@ from atlas_splitter.semantic_models.registry import get_semantic_model
 
 def default_semantic_model_dir() -> Path:
     """Devuelve la raíz de caché exclusiva de modelos semánticos."""
-    return Path.home() / ".cache" / "atlas-splitter" / "semantic-models"
+    configured = os.environ.get("ATLAS_SPLITTER_SEMANTIC_MODEL_DIR")
+    return (
+        Path(configured).expanduser() if configured else Path.home() / ".cache" / "atlas-splitter" / "semantic-models"
+    )
 
 
 def semantic_model_path(name: str, directory: Path | None = None) -> Path:

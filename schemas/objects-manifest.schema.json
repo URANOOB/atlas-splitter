@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Atlas Splitter objects manifest",
+  "type": "object",
+  "required": ["schema_version", "source_file", "objects"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "source_file": {"type": "string"},
+    "objects": {"type": "array"}
+  }
+}

@@ -14,7 +14,9 @@ from rich.console import Console
 from rich.table import Table
 from typer.main import get_command
 
-from atlas_splitter.config import GroupingConfig, apply_cli_overrides, load_config
+from atlas_splitter import __version__
+from atlas_splitter.blender_addon import addon_info, export_blender_addon
+from atlas_splitter.config import GroupingConfig, apply_cli_overrides, load_config, write_default_config
 from atlas_splitter.diagnostics import collect_diagnostics, has_critical_failures
 from atlas_splitter.domain import slugify
 from atlas_splitter.exceptions import (
@@ -29,20 +31,30 @@ from atlas_splitter.exceptions import (
 from atlas_splitter.installer import InstallationError, install_optional_components
 from atlas_splitter.io.image_loader import ImageLoadError, discover_images
 from atlas_splitter.io.zip_writer import write_zip
+from atlas_splitter.models.manager import checkpoint_path, is_downloaded
 from atlas_splitter.models.manager import download_model as fetch_model
-from atlas_splitter.models.manager import is_downloaded
 from atlas_splitter.models.registry import MODELS, get_model
 from atlas_splitter.pipeline import process_image
-from atlas_splitter.reporting.html_report import generate_html_report
-from atlas_splitter.review import apply_review, create_review_template
-from atlas_splitter.semantic_models.manager import download_semantic_model, is_semantic_model_downloaded
+from atlas_splitter.reporting.html_report import generate_html_report, generate_semantic_html_report
+from atlas_splitter.review import apply_review, create_review_template, create_semantic_review_template
+from atlas_splitter.semantic_models.manager import (
+    download_semantic_model,
+    is_semantic_model_downloaded,
+    semantic_model_path,
+)
 from atlas_splitter.semantic_models.registry import SEMANTIC_MODELS, get_semantic_model
 
-app = typer.Typer(help="Separa atlas de texturas mediante procesamiento local.", no_args_is_help=False)
+app = typer.Typer(
+    help="Separa atlas de texturas mediante procesamiento local.", no_args_is_help=False, invoke_without_command=True
+)
 models_app = typer.Typer(help="Gestiona checkpoints de SAM 2.", no_args_is_help=True)
 semantic_models_app = typer.Typer(help="Gestiona modelos semánticos locales.", no_args_is_help=True)
+blender_addon_app = typer.Typer(help="Exporta el add-on portable para Blender.", no_args_is_help=True)
+config_app = typer.Typer(help="Crea, valida y muestra configuración YAML.", no_args_is_help=True)
 app.add_typer(models_app, name="models")
 app.add_typer(semantic_models_app, name="semantic-models", hidden=True)
+app.add_typer(blender_addon_app, name="blender-addon")
+app.add_typer(config_app, name="config")
 console = Console()
 LOGGER = logging.getLogger(__name__)
 
@@ -143,10 +155,14 @@ def _semantic_3d_config(*args: object, **kwargs: object) -> Any:
 @app.callback()
 def common_options(
     debug: Annotated[bool, typer.Option("--debug", help="Muestra traceback completo si ocurre un error.")] = False,
+    version: Annotated[bool, typer.Option("--version", help="Muestra la versión instalada.")] = False,
 ) -> None:
     """Opciones comunes; el traceback se reserva para depuracion explicita."""
     if debug:
         LOGGER.info("Modo de depuracion CLI activado.")
+    if version:
+        console.print(__version__)
+        raise typer.Exit()
 
 
 def _planned(command: str) -> None:
@@ -271,6 +287,7 @@ def doctor(format: Annotated[str, typer.Option("--format", help="text o json")] 
 @app.command()
 def setup(
     component: Annotated[str | None, typer.Argument(help="geometry, ai o all", show_default=False)] = None,
+    device: Annotated[str, typer.Option(help="auto, cpu, cuda o mps; sólo para AI")] = "auto",
     yes: Annotated[bool, typer.Option("--yes", help="Confirma las descargas de dependencias")] = False,
 ) -> None:
     """Comprueba el entorno o instala una capacidad opcional."""
@@ -280,12 +297,20 @@ def setup(
         return
     if component not in {"geometry", "ai", "all"}:
         raise typer.BadParameter("Use geometry, ai o all.", param_hint="component")
+    if component == "ai":
+        explanation = {
+            "auto": "ruedas estándar compatibles; auto no asume CUDA",
+            "cpu": "ruedas estándar para CPU",
+            "cuda": "ruedas estándar; no se fija una versión CUDA",
+            "mps": "ruedas estándar para macOS/MPS",
+        }.get(device, "")
+        console.print(f"AI instalará {explanation}.")
     console.print(f"Se descargar\u00e1n dependencias para {component}; no se descargar\u00e1n modelos.")
     if not yes and not typer.confirm("\u00bfContinuar?", default=False):
         console.print("Instalaci\u00f3n cancelada.")
         return
     try:
-        install_optional_components(component)
+        install_optional_components(component, device=device)
     except InstallationError as error:
         raise typer.BadParameter(str(error), param_hint="component") from error
     console.print(f"[green]Componente {component} listo.[/green]")
@@ -465,7 +490,7 @@ def group(
 ) -> None:
     """Agrupa una extracción existente con el modelo local, sin reprocesar el atlas."""
     if not is_semantic_model_downloaded("qwen3-vl-2b"):
-        raise typer.BadParameter("Qwen3-VL local no está instalado; usa semantic-models download explícitamente.")
+        raise typer.BadParameter("Qwen3-VL local no está instalado; usa models download qwen3-vl-2b explícitamente.")
     try:
         config = GroupingConfig.model_validate({"enabled": True, "device": device})
     except ValidationError as error:
@@ -477,6 +502,7 @@ def group(
         raise typer.BadParameter(str(error), param_hint="output") from error
     finally:
         backend.close()
+    _finalize_semantic_result(output)
     console.print(f"[green]Agrupación creada:[/green] {output / 'semantic_manifest.json'}")
 
 
@@ -494,11 +520,21 @@ def semantic(
     )
     if not is_semantic_model_downloaded("qwen3-vl-2b"):
         raise typer.BadParameter(
-            "Qwen3-VL no está instalado localmente. Instálalo con:\n"
-            "atlas-splitter semantic-models download qwen3-vl-2b",
+            "Qwen3-VL no está instalado localmente. Instálalo con:\natlas-splitter models download qwen3-vl-2b",
             param_hint="atlas",
         )
     run(source=atlas, output=output, auto_group=True)
+
+
+def _finalize_semantic_result(destination: Path) -> None:
+    """Completa los artefactos editables tras una agrupación local."""
+    try:
+        create_semantic_review_template(
+            destination / "manifest.json", destination / "semantic_manifest.json", destination
+        )
+        generate_semantic_html_report(destination)
+    except (InvalidReviewError, OSError, ValueError, json.JSONDecodeError) as error:
+        raise typer.BadParameter(str(error), param_hint="output") from error
 
 
 @app.command("group-3d")
@@ -663,6 +699,7 @@ def run(
             for result_directory in completed:
                 try:
                     _group_extracted_atlas(result_directory, effective_config.grouping, semantic_backend)
+                    _finalize_semantic_result(result_directory)
                     console.print(f"[green]Agrupado:[/green] {result_directory}")
                 except (SemanticInferenceError, SemanticModelUnavailableError, OSError, ValueError) as error:
                     failures += 1
@@ -705,6 +742,8 @@ def translate_simple_args(arguments: list[str]) -> list[str]:
     commands = {
         "advanced",
         "apply-review",
+        "blender-addon",
+        "config",
         "doctor",
         "extract",
         "glb",
@@ -745,6 +784,9 @@ def main() -> None:
         get_command(app).main(args=translate_simple_args(arguments), prog_name="atlas-splitter", standalone_mode=False)
     except typer.Exit as error:
         raise SystemExit(error.exit_code) from error
+    except KeyboardInterrupt:
+        console.print("[yellow]Operación cancelada; no se publicó una salida parcial.[/yellow]")
+        raise SystemExit(130) from None
     except Exception as error:
         if debug:
             console.print_exception()
@@ -767,13 +809,29 @@ def install(
 
 @models_app.command("list")
 def list_models() -> None:
-    """Lista los modelos disponibles y el estado de su checkpoint local."""
-    table = Table(title="Modelos SAM 2")
+    """Lista modelos visuales y semánticos sin consultar Internet."""
+    table = Table(title="Modelos locales")
     table.add_column("Modelo")
-    table.add_column("Checkpoint")
+    table.add_column("Función")
+    table.add_column("Tamaño")
     table.add_column("Estado")
+    table.add_column("Ruta local")
     for name, spec in MODELS.items():
-        table.add_row(name, spec.checkpoint_filename, "instalado" if is_downloaded(name) else "no descargado")
+        table.add_row(
+            name,
+            "Segmentación visual",
+            spec.approximate_size,
+            "instalado" if is_downloaded(name) else "no instalado",
+            str(checkpoint_path(name)),
+        )
+    for name, semantic_spec in SEMANTIC_MODELS.items():
+        table.add_row(
+            name,
+            "Agrupación semántica",
+            semantic_spec.approximate_size,
+            "instalado" if is_semantic_model_downloaded(name) else "no instalado",
+            str(semantic_model_path(name)),
+        )
     console.print(table)
 
 
@@ -781,24 +839,68 @@ def list_models() -> None:
 def download_model(model: Annotated[str, typer.Argument(help="Nombre del modelo")]) -> None:
     """Descarga explícitamente un checkpoint de SAM 2 a la caché local."""
     try:
-        get_model(model)
         with console.status(f"Descargando {model}..."):
-            destination = fetch_model(model)
+            destination = fetch_model(model) if model in MODELS else download_semantic_model(model)
     except (OSError, ValueError) as error:
         raise typer.BadParameter(str(error), param_hint="model") from error
     console.print(f"[green]Checkpoint disponible:[/green] {destination}")
 
 
+@models_app.command("info")
+def model_info(model: Annotated[str, typer.Argument(help="Nombre del modelo")]) -> None:
+    """Muestra metadatos y ruta local sin iniciar una descarga."""
+    if model in MODELS:
+        spec = get_model(model)
+        state = "instalado" if is_downloaded(model) else "no instalado"
+        console.print(
+            f"Modelo: {spec.name}\nFunción: segmentación visual\n"
+            f"Tamaño aproximado: {spec.approximate_size}\nRuta local: {checkpoint_path(model)}\nEstado: {state}"
+        )
+        return
+    if model in SEMANTIC_MODELS:
+        semantic_spec = get_semantic_model(model)
+        state = "instalado" if is_semantic_model_downloaded(model) else "no instalado"
+        console.print(
+            f"Modelo: {semantic_spec.name}\nFunción: agrupación semántica\n"
+            f"Tamaño aproximado: {semantic_spec.approximate_size}\n"
+            f"Ruta local: {semantic_model_path(model)}\nEstado: {state}"
+        )
+        return
+    raise typer.BadParameter("Modelo no admitido.", param_hint="model")
+
+
+@models_app.command("remove")
+def remove_model(
+    model: Annotated[str, typer.Argument(help="Nombre del modelo")],
+    yes: Annotated[bool, typer.Option("--yes", help="No pedir confirmación")] = False,
+) -> None:
+    """Elimina sólo el checkpoint o directorio local confirmado."""
+    if model in MODELS:
+        target = checkpoint_path(model)
+    elif model in SEMANTIC_MODELS:
+        target = semantic_model_path(model)
+    else:
+        raise typer.BadParameter("Modelo no admitido.", param_hint="model")
+    if not target.exists():
+        console.print("Modelo no instalado.")
+        return
+    if not yes and not typer.confirm(f"¿Eliminar modelo local en {target}?", default=False):
+        console.print("Eliminación cancelada.")
+        return
+    if target.is_dir():
+        import shutil
+
+        shutil.rmtree(target)
+    else:
+        target.unlink()
+    console.print(f"[green]Modelo eliminado:[/green] {model}")
+
+
 @semantic_models_app.command("list")
 def list_semantic_models() -> None:
     """Lista los modelos semánticos locales sin iniciar descargas."""
-    table = Table(title="Modelos semánticos")
-    table.add_column("Modelo")
-    table.add_column("Repositorio")
-    table.add_column("Estado")
-    for name, spec in SEMANTIC_MODELS.items():
-        table.add_row(name, spec.repository_id, "instalado" if is_semantic_model_downloaded(name) else "no descargado")
-    console.print(table)
+    _warn_deprecated("semantic-models", "models")
+    list_models()
 
 
 @semantic_models_app.command("download")
@@ -806,13 +908,66 @@ def download_registered_semantic_model(
     model: Annotated[str, typer.Argument(help="Nombre del modelo semántico")],
 ) -> None:
     """Descarga explícitamente un modelo semántico a la caché local."""
+    _warn_deprecated("semantic-models", "models")
+    download_model(model)
+
+
+@blender_addon_app.command("export")
+def export_blender_addon_command(
+    output: Annotated[Path, typer.Option(help="Carpeta o ZIP de destino")] = Path("."),
+    yes: Annotated[bool, typer.Option("--yes", help="Sobrescribe sin preguntar")] = False,
+) -> None:
+    """Crea el ZIP instalable del add-on desde el paquete instalado."""
+    destination = output / "atlas_splitter_blender.zip" if output.suffix.lower() != ".zip" else output
+    if destination.exists() and not yes and not typer.confirm(f"¿Sobrescribir {destination}?", default=False):
+        console.print("Exportación cancelada.")
+        return
     try:
-        get_semantic_model(model)
-        with console.status(f"Descargando {model}..."):
-            destination = download_semantic_model(model)
-    except (OSError, RuntimeError, ValueError) as error:
-        raise typer.BadParameter(str(error), param_hint="model") from error
-    console.print(f"[green]Modelo semántico disponible:[/green] {destination}")
+        written = export_blender_addon(output, overwrite=yes or destination.exists())
+    except (OSError, ValueError) as error:
+        raise typer.BadParameter(str(error), param_hint="--output") from error
+    console.print(f"[green]Add-on de Blender creado:[/green] {written}")
+
+
+@blender_addon_app.command("info")
+def blender_addon_info() -> None:
+    """Muestra compatibilidad e instalación resumida del add-on."""
+    info = addon_info()
+    console.print(
+        f"Versión: {info['version']}\nBlender mínimo: {info['minimum_blender']}\n"
+        f"Manifiestos: {info['manifest_schema']}\n{info['installation']}"
+    )
+
+
+@config_app.command("init")
+def config_init(
+    destination: Annotated[Path, typer.Argument(help="YAML que se creará")] = Path("atlas-splitter.yml"),
+) -> None:
+    """Crea una configuración inicial sin sobrescribir un archivo existente."""
+    try:
+        written = write_default_config(destination)
+    except OSError as error:
+        raise typer.BadParameter(str(error), param_hint="destination") from error
+    console.print(f"[green]Configuración lista:[/green] {written}")
+
+
+@config_app.command("validate")
+def config_validate(source: Annotated[Path, typer.Argument(help="Archivo YAML")]) -> None:
+    """Valida campos y valores de un YAML sin ejecutar procesamiento."""
+    try:
+        load_config(source)
+    except (OSError, ValidationError, ValueError) as error:
+        raise typer.BadParameter(str(error), param_hint="source") from error
+    console.print("[green]Configuración válida.[/green]")
+
+
+@config_app.command("show")
+def config_show(source: Annotated[Path | None, typer.Argument(help="YAML opcional")] = None) -> None:
+    """Muestra la configuración efectiva, incluida la predeterminada."""
+    try:
+        console.print_json(load_config(source).model_dump_json(indent=2))
+    except (OSError, ValidationError, ValueError) as error:
+        raise typer.BadParameter(str(error), param_hint="source") from error
 
 
 @app.command()

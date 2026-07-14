@@ -6,6 +6,7 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
+from atlas_splitter import __version__
 from atlas_splitter.config import AppConfig
 from atlas_splitter.domain.manifests import SCHEMA_VERSION
 from atlas_splitter.io.image_loader import LoadedImage
@@ -25,6 +26,7 @@ def write_manifest(
     """Escribe metadatos reproducibles y asociaciones de cada elemento."""
     data = {
         "schema_version": SCHEMA_VERSION,
+        "tool_version": __version__,
         "capabilities": {
             "uv_available": False,
             "geometry_available": False,

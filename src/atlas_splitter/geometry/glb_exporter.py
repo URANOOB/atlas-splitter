@@ -40,6 +40,7 @@ from atlas_splitter.geometry.uv_rasterizer import rasterize_uv_triangles
 
 LOGGER = logging.getLogger(__name__)
 GroupBy = Literal["node", "mesh", "primitive", "uv-island"]
+_MAX_UV_ISLANDS_PER_PRIMITIVE = 512
 
 
 def export_glb(
@@ -97,10 +98,16 @@ def export_glb(
             raise PrimitiveDecodeError(f"La primitiva {primitive.reference} no contiene TEXCOORD_{binding.texcoord}.")
         uvs = primitive.texcoords[binding.texcoord]
         groups = _groups(primitive.triangle_indices, group_by, uvs, uv_tolerance)
+        if group_by == "uv-island" and len(groups) > _MAX_UV_ISLANDS_PER_PRIMITIVE:
+            raise GltfLoadError(
+                f"La primitiva {primitive.reference} contiene {len(groups)} islas UV; "
+                f"el límite seguro es {_MAX_UV_ISLANDS_PER_PRIMITIVE}. "
+                "Use --group-by primitive, mesh o node para evitar un uso excesivo de memoria."
+            )
+        source_image = override or read_texture_image(loaded, binding.image_index)
         for group_index, triangle_rows in enumerate(groups):
             triangles = primitive.triangle_indices[triangle_rows]
             transformed = _flip_v(binding.transform.apply(uvs)) if flip_v else binding.transform.apply(uvs)
-            source_image = override or read_texture_image(loaded, binding.image_index)
             region = rasterize_uv_triangles(
                 transformed, triangles, source_image.width, source_image.height, binding.wrap_s, binding.wrap_t
             )

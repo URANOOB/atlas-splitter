@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Atlas Splitter project",
+  "type": "object",
+  "required": ["schema_version", "tool_version", "atlases"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "tool_version": {"type": "string"},
+    "atlases": {"type": "array"}
+  }
+}

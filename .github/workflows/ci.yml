@@ -5,6 +5,55 @@ on:
   pull_request:
 
 jobs:
+  base-wheel-smoke:
+    name: Base wheel smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --upgrade pip build
+      - run: python -m build
+      - run: python -m venv .wheel-smoke
+      - run: .wheel-smoke/bin/python -m pip install dist/*.whl
+      - name: Verify base install has no optional runtimes
+        run: |
+          ! .wheel-smoke/bin/python -c "import pygltflib"
+          ! .wheel-smoke/bin/python -c "import trimesh"
+          ! .wheel-smoke/bin/python -c "import torch"
+          ! .wheel-smoke/bin/python -c "import transformers"
+          ! .wheel-smoke/bin/python -c "import sam2"
+      - name: Exercise public base CLI
+        run: |
+          .wheel-smoke/bin/atlas-splitter --help
+          .wheel-smoke/bin/atlas-splitter doctor --format json || test $? -eq 1
+          .wheel-smoke/bin/atlas-splitter split --help
+          .wheel-smoke/bin/atlas-splitter extract --help
+          .wheel-smoke/bin/atlas-splitter semantic --help
+          .wheel-smoke/bin/python scripts/create_test_atlas.py
+          .wheel-smoke/bin/atlas-splitter split work/synthetic_atlas.webp --output smoke-output
+          test -f smoke-output/synthetic_atlas/manifest.json
+          test -f smoke-output/synthetic_atlas/report/index.html
+          test -d smoke-output/synthetic_atlas/png
+          test -d smoke-output/synthetic_atlas/masks
+          test -d smoke-output/synthetic_atlas/psd
+          test -f smoke-output/synthetic_atlas-atlas-splitter.zip
+          ! .wheel-smoke/bin/atlas-splitter extract missing.glb 2>&1 | grep -q Traceback
+          .wheel-smoke/bin/atlas-splitter extract missing.glb 2>&1 | grep -q 'atlas-splitter setup geometry'
+  pipx-wheel-smoke:
+    name: pipx wheel smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --upgrade pip build pipx
+      - run: python -m build
+      - run: pipx install dist/*.whl
+      - run: atlas-splitter --help
+      - run: atlas-splitter doctor --format json || test $? -eq 1
   test:
     name: ${{ matrix.os }} / Python ${{ matrix.python }}
     runs-on: ${{ matrix.os }}

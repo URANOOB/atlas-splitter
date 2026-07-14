@@ -17,4 +17,4 @@ atlas-splitter setup ai
 atlas-splitter setup all
 ```
 
-Si `doctor` indica un componente opcional ausente, ejecuta el `setup` indicado. Los modelos se descargan únicamente con `atlas-splitter models download` o `atlas-splitter semantic-models download`.
+Si `doctor` indica un componente opcional ausente, ejecuta el `setup` indicado. Los modelos se descargan únicamente con `atlas-splitter models download`; `semantic-models` es un alias oculto y deprecado.

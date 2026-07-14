@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 from urllib.request import urlopen
@@ -11,7 +12,8 @@ from atlas_splitter.models.registry import ModelSpec, get_model
 
 def default_checkpoint_dir() -> Path:
     """Ubicación de caché por usuario, independiente del directorio del proyecto."""
-    return Path.home() / ".cache" / "atlas-splitter" / "checkpoints"
+    configured = os.environ.get("ATLAS_SPLITTER_CHECKPOINT_DIR")
+    return Path(configured).expanduser() if configured else Path.home() / ".cache" / "atlas-splitter" / "checkpoints"
 
 
 def checkpoint_path(name: str, directory: Path | None = None) -> Path:

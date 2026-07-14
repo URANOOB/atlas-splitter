@@ -4,15 +4,59 @@ on:
   push:
     tags: ["v*"]
 
+permissions:
+  contents: write
+
 jobs:
-  wheel:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: python -m pip install build
+      - run: python -m pip install --upgrade pip build '.[dev,docs,geometry]'
+      - run: test "${GITHUB_REF_NAME#v}" = "$(python -c 'from atlas_splitter import __version__; print(__version__)')"
+      - run: python -m pytest
+      - run: python -m ruff check .
+      - run: python -m mypy
+      - run: mkdocs build --strict
+      - run: python scripts/generate_cli_docs.py --check
+      - run: python scripts/validate_doc_examples.py
+  build-python-and-addon:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python -m pip install --upgrade pip build
       - run: python -m build
-      - run: sha256sum dist/* > dist/SHA256SUMS.txt
+      - run: python -m pip install dist/*.whl
+      - run: atlas-splitter blender-addon export --output dist
       - uses: actions/upload-artifact@v4
-        with: { name: python-distributions, path: dist }
+        with: { name: python-and-addon, path: dist }
+  build-windows-lite:
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: powershell -ExecutionPolicy Bypass -File scripts/build-windows-lite.ps1 -Edition Lite
+      - run: Get-ChildItem -Recurse dist
+      - uses: actions/upload-artifact@v4
+        with: { name: windows-lite, path: dist }
+  release:
+    needs: [build-python-and-addon, build-windows-lite]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: dist }
+      - run: find dist -type f -exec cp {} dist/ \;
+      - run: test -f dist/atlas_splitter_blender.zip
+      - run: test -f dist/AtlasSplitter-Lite.zip
+      - run: sha256sum dist/* > dist/SHA256SUMS.txt
+      - run: gh release create "$GITHUB_REF_NAME" dist/*.whl dist/*.tar.gz dist/AtlasSplitter-Lite.zip dist/atlas_splitter_blender.zip dist/SHA256SUMS.txt CHANGELOG.md --title "$GITHUB_REF_NAME" --notes-file CHANGELOG.md
+        env:
+          GH_TOKEN: ${{ github.token }}

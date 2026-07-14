@@ -46,7 +46,7 @@ class Qwen3VLSemanticGroupingBackend(SemanticGroupingBackend):
             path = semantic_model_path(self.model_name)
             raise SemanticModelUnavailableError(
                 f"No existe el modelo semántico local en {path}. "
-                f"Ejecute: atlas-splitter semantic-models download {self.model_name}"
+                f"Ejecute: atlas-splitter models download {self.model_name}"
             )
         try:
             import torch

@@ -19,6 +19,16 @@ def test_models_list() -> None:
     result = runner.invoke(app, ["models", "list"])
     assert result.exit_code == 0
     assert "sam2-small" in result.stdout
+    assert "qwen3-vl-2b" in result.stdout
+
+
+def test_version_and_config_commands_are_public(tmp_path) -> None:
+    assert runner.invoke(app, ["--version"]).exit_code == 0
+    initialized = runner.invoke(app, ["config", "init", str(tmp_path / "atlas-splitter.yml")])
+    validated = runner.invoke(app, ["config", "validate", str(tmp_path / "atlas-splitter.yml")])
+
+    assert initialized.exit_code == 0
+    assert validated.exit_code == 0
 
 
 def test_doctor_supports_json_output() -> None:

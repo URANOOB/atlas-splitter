@@ -2,7 +2,17 @@
 
 Separa atlas de texturas localmente para editarlos como piezas 2D o extraer regiones UV exactas desde un GLB/glTF.
 
+## De atlas a piezas editables
+
+| Atlas original | Pieza extraída |
+| --- | --- |
+| ![Atlas original con la casa](docs/examples/atlas-original.png) | ![Pieza de techo extraída con transparencia](docs/examples/atlas-extraido.png) |
+
+El flujo conserva la transparencia y deja cada región lista para edición 2D.
+
 ![Objetos separados en Blender](docs/assets/semantic-first-house-separated.png)
+
+La extracción semántica también deja objetos separados para revisar y ajustar en Blender.
 
 | Tengo | Debo usar | Precisión |
 | --- | --- | --- |
@@ -36,7 +46,7 @@ atlas-splitter semantic atlas.webp --output resultados
 `split` genera `png/`, `masks/`, `psd/`, `manifest.json`, un reporte HTML y un ZIP. `extract` genera manifiestos UV y scripts de Blender. `semantic` usa Qwen3-VL local sólo si se descargó explícitamente:
 
 ```text
-atlas-splitter semantic-models download qwen3-vl-2b
+atlas-splitter models download qwen3-vl-2b
 ```
 
 ## Límites

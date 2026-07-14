@@ -12,6 +12,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from atlas_splitter.models.manager import default_checkpoint_dir
+from atlas_splitter.semantic_models.manager import default_semantic_model_dir
+
 
 @dataclass(frozen=True)
 class DiagnosticCheck:
@@ -132,10 +135,10 @@ def collect_diagnostics(
     for label, module in (("OpenCV", "cv2"), ("Geometría glTF", "pygltflib")):
         version = module_version(module)
         checks.append(DiagnosticCheck(label, version is not None, version or "no instalado"))
-    checkpoint_root = checkpoint_dir or Path.home() / ".cache" / "atlas-splitter" / "checkpoints"
+    checkpoint_root = checkpoint_dir or default_checkpoint_dir()
     has_checkpoint = checkpoint_root.exists() and any(checkpoint_root.glob("*.pt"))
     checks.append(DiagnosticCheck("Checkpoint SAM 2", has_checkpoint, str(checkpoint_root)))
-    semantic_root = Path.home() / ".cache" / "atlas-splitter" / "semantic-models"
+    semantic_root = default_semantic_model_dir()
     has_semantic_model = semantic_root.is_dir() and any(semantic_root.glob("*/config.json"))
     checks.append(DiagnosticCheck("Qwen3-VL local", has_semantic_model, str(semantic_root)))
     checks.append(DiagnosticCheck("Caché SAM 2", checkpoint_root.is_dir(), str(checkpoint_root)))

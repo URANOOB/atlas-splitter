@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Atlas Splitter semantic manifest",
+  "type": "object",
+  "required": ["source_manifest", "groups", "unassigned_piece_ids"],
+  "properties": {
+    "source_manifest": {"const": "manifest.json"},
+    "groups": {"type": "array", "items": {"type": "object", "required": ["name", "piece_ids", "confidence", "status"]}},
+    "unassigned_piece_ids": {"type": "array", "items": {"type": "string"}}
+  }
+}

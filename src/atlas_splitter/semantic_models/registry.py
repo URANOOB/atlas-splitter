@@ -10,6 +10,7 @@ class SemanticModelSpec:
     name: str
     repository_id: str
     local_directory_name: str
+    approximate_size: str
 
 
 SEMANTIC_MODELS: dict[str, SemanticModelSpec] = {
@@ -17,6 +18,7 @@ SEMANTIC_MODELS: dict[str, SemanticModelSpec] = {
         name="qwen3-vl-2b",
         repository_id="Qwen/Qwen3-VL-2B-Instruct",
         local_directory_name="qwen3-vl-2b",
+        approximate_size="~4 GB",
     )
 }
 

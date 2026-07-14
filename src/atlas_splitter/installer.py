@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -10,7 +11,7 @@ import venv
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
-from atlas_splitter.models.manager import download_model
+from atlas_splitter.models.manager import checkpoint_path
 
 
 class InstallationError(RuntimeError):
@@ -20,19 +21,35 @@ class InstallationError(RuntimeError):
 OFFICIAL_REPOSITORY = "git+https://github.com/URANOOB/atlas-splitter.git"
 
 
-def install_optional_components(component: str, python_executable: Path | None = None) -> None:
-    """Instala extras sin depender del directorio actual."""
+def build_optional_install_command(
+    component: str, *, device: str = "auto", python_executable: Path | None = None, system: str | None = None
+) -> list[str]:
+    """Construye una instalación portable sin descargar ni asumir CUDA."""
     extras = {"geometry": "geometry", "ai": "vision,semantic", "all": "vision,semantic,geometry"}
     if component not in extras:
         raise InstallationError("Componente no compatible. Use geometry, ai o all.")
+    if device not in {"auto", "cpu", "cuda", "mps"}:
+        raise InstallationError("Dispositivo no compatible. Use auto, cpu, cuda o mps.")
+    current_system = system or platform.system()
+    if device == "mps" and current_system != "Darwin":
+        raise InstallationError("MPS sólo está disponible en macOS.")
+    if device == "cuda" and current_system == "Darwin":
+        raise InstallationError("CUDA no está disponible en macOS; use mps o cpu.")
     python = python_executable or Path(sys.executable)
     try:
         version("atlas-splitter")
         requirement = f"atlas-splitter[{extras[component]}]"
     except PackageNotFoundError:
         requirement = f"atlas-splitter[{extras[component]}] @ {OFFICIAL_REPOSITORY}"
+    return [str(python), "-m", "pip", "install", requirement]
+
+
+def install_optional_components(component: str, python_executable: Path | None = None, *, device: str = "auto") -> None:
+    """Instala extras sin depender del directorio actual ni fijar CUDA."""
     try:
-        subprocess.run([str(python), "-m", "pip", "install", requirement], check=True)
+        subprocess.run(
+            build_optional_install_command(component, device=device, python_executable=python_executable), check=True
+        )
     except (OSError, subprocess.CalledProcessError) as error:
         raise InstallationError(f"No se pudo instalar {component}: {error}") from error
 
@@ -63,25 +80,13 @@ def create_isolated_environment(project_root: Path, environment: Path | None = N
 
 
 def install_runtime(model: str, python_executable: Path | None = None) -> Path:
-    """Instala PyTorch CUDA, SAM 2 y un checkpoint local con pasos visibles."""
+    """Compatibilidad heredada: prepara dependencias, nunca descarga el modelo."""
     if shutil.which("git") is None:
         raise InstallationError("Se necesita Git para descargar SAM 2.")
     python = python_executable or Path(sys.executable)
     sam2_root = Path.home() / ".local" / "share" / "atlas-splitter" / "sam2"
     try:
-        subprocess.run(
-            [
-                str(python),
-                "-m",
-                "pip",
-                "install",
-                "torch==2.5.1",
-                "torchvision==0.20.1",
-                "--index-url",
-                "https://download.pytorch.org/whl/cu121",
-            ],
-            check=True,
-        )
+        subprocess.run([str(python), "-m", "pip", "install", "torch", "torchvision"], check=True)
         if not (sam2_root / ".git").is_dir():
             sam2_root.parent.mkdir(parents=True, exist_ok=True)
             subprocess.run(
@@ -94,6 +99,6 @@ def install_runtime(model: str, python_executable: Path | None = None) -> Path:
             check=True,
             env=environment,
         )
-        return download_model(model)
+        return checkpoint_path(model)
     except subprocess.CalledProcessError as error:
         raise InstallationError(f"La instalación falló con código {error.returncode}.") from error

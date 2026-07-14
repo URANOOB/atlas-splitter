@@ -45,14 +45,19 @@ class DracoDecoder:
     """Ejecuta Node local y sólo los dos artefactos Draco proporcionados."""
 
     def __init__(self, project_root: Path | None = None, node_executable: Path | None = None) -> None:
-        root = project_root or Path(__file__).resolve().parents[3]
-        candidate = root / "Draco" / "gltf"
-        if not candidate.is_dir():
+        configured_directory = os.environ.get("ATLAS_SPLITTER_DRACO_DIR")
+        if configured_directory:
+            configured = Path(configured_directory).expanduser()
+            candidate = configured / "gltf" if (configured / "gltf").is_dir() else configured
+        else:
+            root = project_root or Path(__file__).resolve().parents[3]
+            candidate = root / "Draco" / "gltf"
+        if not candidate.is_dir() and not configured_directory:
             candidate = root / "draco" / "gltf"  # Compatibilidad con árboles existentes sensibles a mayúsculas.
         self.decoder_js = candidate / "draco_decoder.js"
         self.decoder_wasm = candidate / "draco_decoder.wasm"
-        configured = os.environ.get("ATLAS_SPLITTER_NODE")
-        self.node_executable = node_executable or (Path(configured) if configured else self._find_node())
+        configured_node = os.environ.get("ATLAS_SPLITTER_NODE")
+        self.node_executable = node_executable or (Path(configured_node) if configured_node else self._find_node())
         self.last_diagnostic: DracoDiagnostic | None = None
 
     def decode(self, loaded: LoadedGltf, extension: dict[str, Any]) -> DracoGeometry:

@@ -9,6 +9,7 @@ from pathlib import Path
 from atlas_splitter.config import GroupingConfig
 from atlas_splitter.io.grouped_psd_writer import write_grouped_psd
 from atlas_splitter.io.image_loader import load_image
+from atlas_splitter.io.paths import resolve_project_path
 from atlas_splitter.reporting.annotated_atlas import write_annotated_atlas
 from atlas_splitter.reporting.candidate_group_sheet import write_candidate_group_sheet
 from atlas_splitter.reporting.group_preview import write_group_preview
@@ -51,9 +52,9 @@ def _pieces_from_manifest(destination: Path, manifest: dict[str, object]) -> lis
             PieceReference(
                 piece_id=f"E{index:03d}",
                 element_index=index,
-                png_path=destination / str(raw["png"]),
-                mask_path=destination / str(raw["mask"]),
-                psd_path=(destination / str(raw["psd"])) if raw.get("psd") else None,
+                png_path=resolve_project_path(destination, str(raw["png"])),
+                mask_path=resolve_project_path(destination, str(raw["mask"])),
+                psd_path=resolve_project_path(destination, str(raw["psd"])) if raw.get("psd") else None,
                 bbox=(x, y, width, height),
                 area=int(raw["area"]),
                 source=str(raw["source"]),

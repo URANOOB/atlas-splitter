@@ -1,9 +1,20 @@
 """Add-on mínimo de Atlas Splitter para Blender 4.x."""
 
+try:
+    from atlas_splitter import __version__ as _PACKAGE_VERSION
+except ImportError:  # El ZIP de Blender funciona sin instalar la CLI.
+    _PACKAGE_VERSION = "0.2.0"
+
+
+def _version_tuple(value: str) -> tuple[int, int, int]:
+    """Convierte la versión del paquete al formato requerido por Blender."""
+    parts = value.split(".")[:3]
+    return tuple(int(part) for part in parts) + (0,) * (3 - len(parts))
+
 bl_info = {
     "name": "Atlas Splitter",
     "author": "Atlas Splitter contributors",
-    "version": (0, 1, 0),
+    "version": _version_tuple(_PACKAGE_VERSION),
     "blender": (4, 0, 0),
     "location": "View3D > Sidebar > Atlas Splitter",
     "description": "Carga manifiestos locales de Atlas Splitter",
