@@ -1,13 +1,12 @@
 # Primer atlas
 
-## Requisitos
+Aprenderás a dividir una imagen 2D basada puramente en el espacio vacío (transparencia).
 
-Un archivo WEBP local. No requiere GPU ni modelos.
+1. Ten a mano una imagen `textura.png` con canal alfa.
+2. Ejecuta el comando:
+   ```text
+   atlas-splitter split textura.png --output mi_textura
+   ```
+3. Explora la carpeta generada. Encontrarás múltiples imágenes más pequeñas correspondientes a cada "isla" de píxeles descubierta.
 
-```text
-atlas-splitter split atlas.webp --output resultados
-```
-
-El resultado queda en `resultados/atlas`: PNG, máscaras, PSD, `manifest.json`, reporte HTML y `atlas-atlas-splitter.zip`.
-
-Si las piezas son demasiado pequeñas, revisa el atlas o usa el modo avanzado con `--min-area`. Para revisar el resultado: `atlas-splitter preview resultados/atlas`.
+Para más detalles, lee la guía de [Segmentación visual](../guides/visual-segmentation.md).

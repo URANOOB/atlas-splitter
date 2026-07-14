@@ -22,13 +22,29 @@ def _usage(command: click.Command, path: tuple[str, ...]) -> str:
 
 def _option_rows(command: click.Command) -> list[str]:
     rows: list[str] = []
-    for parameter in command.params:
-        if isinstance(parameter, click.Option) and not parameter.hidden:
-            names = ", ".join(parameter.opts)
-            default = str(parameter.default) if parameter.default not in (None, (), False) else "—"
-            rows.append(f"| `{names}` | `{default}` | {parameter.help or '—'} |")
-        elif isinstance(parameter, click.Argument):
-            rows.append(f"| `{parameter.human_readable_name}` | requerido | argumento |")
+    
+    # Extraer y ordenar parámetros para separar requeridos de opcionales
+    args = [p for p in command.params if isinstance(p, click.Argument)]
+    opts = [p for p in command.params if isinstance(p, click.Option) and not p.hidden]
+    
+    # Procesar argumentos (siempre requeridos a menos que tengan default, pero typer no suele)
+    for p in args:
+        rows.append(f"| `{p.human_readable_name}` | requerido | — | argumento |")
+        
+    # Procesar opciones
+    for p in opts:
+        # Extraer opciones primarias y secundarias
+        opt_names = sorted(p.opts, key=lambda x: len(x), reverse=True)
+        primary = f"`{opt_names[0]}`"
+        secondary = f"`{', '.join(opt_names[1:])}`" if len(opt_names) > 1 else "—"
+        
+        req_str = "requerido" if p.required else "opcional"
+        default = str(p.default) if p.default not in (None, (), False, "") else "—"
+        
+        rows.append(f"| {primary} | {req_str} | `{default}` | {p.help or '—'} |")
+        if secondary != "—":
+            rows.append(f"| {secondary} | {req_str} | `{default}` | Alias de {primary} |")
+            
     return rows
 
 
@@ -37,7 +53,7 @@ def _render_command(command: click.Command, path: tuple[str, ...]) -> list[str]:
     lines = [f"## `{title}`", "", command.help or "Sin descripción.", "", "```text", _usage(command, path), "```", ""]
     rows = _option_rows(command)
     if rows:
-        lines.extend(["| Opción o argumento | Predeterminado | Descripción |", "| --- | --- | --- |", *rows, ""])
+        lines.extend(["| Opción o argumento | Estado | Predeterminado | Descripción |", "| --- | --- | --- | --- |", *rows, ""])
     return lines
 
 
@@ -52,24 +68,43 @@ def render() -> str:
         "",
     ]
     commands = getattr(root, "commands", {})
+    hidden_commands = []
+    
     for name, command in commands.items():
         if command.hidden:
+            hidden_commands.append((name, command))
             continue
         lines.extend(_render_command(command, (name,)))
         if isinstance(command, click.Group):
             for child_name, child in command.commands.items():
-                if not child.hidden:
-                    lines.extend(_render_command(child, (name, child_name)))
-    lines.extend(
-        [
-            "## Alias de compatibilidad",
+                if child.hidden:
+                    hidden_commands.append((f"{name} {child_name}", child))
+                    continue
+                lines.extend(_render_command(child, (name, child_name)))
+                
+    if hidden_commands:
+        lines.extend([
+            "## Alias de compatibilidad (Ocultos)",
             "",
-            "`run`, `glb`, `install`, `semantic-3d` y `semantic-models` son alias ocultos y deprecados. "
-            "Usa `split`, `extract`, `setup`, `group-3d` y `models`.",
-            "",
-        ]
-    )
-    return "\n".join(lines)
+            "Estos comandos existen por razones de compatibilidad con versiones anteriores, pero no deben utilizarse en nuevos flujos de trabajo.",
+            ""
+        ])
+        for name, cmd in hidden_commands:
+            lines.extend(_render_command(cmd, tuple(name.split())))
+
+    lines.extend([
+        "## Códigos de salida conocidos",
+        "",
+        "La CLI devuelve los siguientes códigos de salida al sistema operativo:",
+        "",
+        "* `0`: Éxito.",
+        "* `1`: Error genérico o excepción no controlada.",
+        "* `2`: Error de sintaxis en los argumentos de la CLI (generado por Click/Typer).",
+        "* `E001` - `E100`: Revisa la [referencia de códigos de error](error-codes.md).",
+        ""
+    ])
+            
+    return "\\n".join(lines)
 
 
 def main() -> int:

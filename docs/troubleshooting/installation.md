@@ -1,24 +1,10 @@
-# Problemas de instalación
+# Instalación
 
-## Síntoma
-
-`atlas-splitter` no se reconoce, o `doctor` muestra una dependencia opcional ausente.
-
-## Causa probable
-
-El entorno de `pipx` o virtualenv no está en PATH, o aún no instalaste Geometry/AI.
-
-## Comprobación
-
+**Síntoma:** El comando falla al instalar.
+**Causa probable:** Python no está en PATH o versión incorrecta.
+**Comprobación:** `python --version` (debe ser 3.11+).
+**Solución:** Reinstala Python asegurando marcar "Add to PATH".
+**Comando de diagnóstico:** 
 ```text
-atlas-splitter doctor --format json
-python --version
+atlas-splitter doctor
 ```
-
-## Solución
-
-Reabre la terminal después de instalar con pipx. Para una capacidad opcional usa `atlas-splitter setup geometry` o `atlas-splitter setup ai`; confirma la descarga. No se descargan modelos en ese paso.
-
-## Código y siguiente paso
-
-Los errores de instalación muestran un comando `setup` recomendado. Si persiste, crea un virtualenv limpio e instala el wheel generado.

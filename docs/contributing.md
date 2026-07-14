@@ -1,10 +1,7 @@
 # Contribuir
 
-Usa Python 3.11+, `pathlib`, tipado y errores específicos. No descargues modelos durante `run`. Toda conducta nueva necesita pruebas sin GPU.
+¡Agradecemos las contribuciones!
 
-```text
-python -m pytest
-python -m ruff check .
-python -m mypy
-python -m build
-```
+Si deseas enviar código, haz un fork del repositorio, crea una rama, ejecuta los tests (`pytest`) y envía un Pull Request.
+
+Para problemas, abre un issue describiendo el síntoma.

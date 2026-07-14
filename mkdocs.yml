@@ -9,6 +9,7 @@ nav:
   - Inicio: index.md
   - Primeros pasos:
       - Instalación: getting-started/installation.md
+      - Inicio rápido: getting-started/quickstart.md
       - Primer atlas: getting-started/first-split.md
       - Primer GLB: getting-started/first-glb-extraction.md
       - Windows portable: getting-started/windows-portable.md
@@ -18,21 +19,34 @@ nav:
       - Agrupación semántica: guides/semantic-grouping.md
       - Revisión manual: guides/manual-review.md
       - Blender: guides/blender.md
+      - Mover proyectos: guides/moving-projects.md
+  - Conceptos:
+      - Atlas: concepts/texture-atlas.md
+      - Coordenadas UV: concepts/uv-coordinates.md
+      - Visual vs Geometría: concepts/visual-vs-geometry.md
+      - Agrupación semántica: concepts/semantic-grouping.md
+      - Manifiestos: concepts/manifests.md
+      - Procesamiento local: concepts/local-processing.md
+      - Limitaciones: concepts/limitations.md
   - Referencia:
       - CLI: reference/cli.md
       - Configuración: reference/configuration.md
       - Manifiestos: reference/manifests.md
-      - Salida: reference/output-structure.md
-  - Conceptos:
-      - Atlas: concepts/texture-atlas.md
-      - Coordenadas UV: concepts/uv-coordinates.md
-      - Límites: concepts/limitations.md
-  - Problemas:
+      - Estructura de salida: reference/output-structure.md
+      - Modelos: reference/models.md
+      - Códigos de error: reference/error-codes.md
+  - Solución de problemas:
       - Instalación: troubleshooting/installation.md
-      - CUDA y MPS: troubleshooting/cuda.md
-      - Blender: troubleshooting/blender.md
+      - PATH y pipx: troubleshooting/path-and-pipx.md
+      - CPU, CUDA y MPS: troubleshooting/cpu-cuda-mps.md
+      - Modelos: troubleshooting/models.md
+      - Memoria: troubleshooting/memory.md
       - GLB: troubleshooting/glb.md
+      - Draco: troubleshooting/draco.md
+      - Blender: troubleshooting/blender.md
+      - ZIP y archivos: troubleshooting/zip-and-files.md
+      - Manifiestos: troubleshooting/manifests.md
   - Proyecto:
       - Contribuir: contributing.md
       - Seguridad: security.md
-      - Cambios: changelog.md
+      - Historial de cambios: changelog.md

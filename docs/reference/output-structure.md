@@ -1,20 +1,46 @@
 # Estructura de salida
 
-`split atlas.webp --output resultados` crea un directorio por atlas. Los PNG, máscaras y PSD son resultados base; puedes copiarlos, pero no cambies rutas dentro de `manifest.json`.
-
+## `split`
 ```text
 resultados/
-└── atlas/
-    ├── manifest.json
-    ├── report/index.html
-    ├── png/
-    ├── masks/
-    ├── psd/
-    └── atlas-atlas-splitter.zip
+├── manifest.json        (Generado)
+├── report/              (Temporales/Regenerables)
+│   └── index.html
+└── objects/             (Permanentes)
+    ├── obj_000.png
+    └── obj_001.png
 ```
 
-`semantic` agrega `semantic_manifest.json`, `review.json`, `grouped/`, `group_previews/`, `objects/`, `uncertain/` y `unassigned/`. Los nombres de grupo son inferencias; abre el reporte y corrige `review.json` antes de ejecutar `apply-review`.
+## `semantic`
+Añade a lo anterior:
+```text
+├── semantic_manifest.json (Generado)
+├── review.json            (Editable)
+└── grouped/               (Generados/Regenerables)
+    ├── walls/
+    │   └── obj_000.png
+    └── uncertain/
+```
 
-`extract` agrega `uv_manifest.json`, `objects_manifest.json`, `project.json` y `blender/rebuild_scene.py`. Esas salidas proceden de geometría y UV, no de una inferencia visual.
+## `extract`
+```text
+resultados/
+├── uv_manifest.json       (Generado)
+├── objects_manifest.json  (Generado)
+├── project.json           (Raíz de Blender, Permanente)
+└── blender/               (Generado)
+    └── rebuild_scene.py
+```
 
-El ZIP se publica al final. Puede vivir dentro o fuera de resultados, pero nunca contiene el propio archivo ZIP ni enlaces simbólicos que salgan del proyecto.
+## Revisión aplicada
+Si ejecutas `apply-review`, aparecerá:
+```text
+├── review_applied.json    (Registro, no editable)
+```
+Y la carpeta `grouped/` será regenerada con tus cambios manuales.
+
+## Add-on exportado
+Al usar `blender-addon export --output .` obtienes:
+```text
+└── atlas_splitter_blender.zip
+```

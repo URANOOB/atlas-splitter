@@ -1,9 +1,10 @@
-# Cambios
+# Historial de cambios
 
-## 0.2.0
+## v0.2.0
+* Soporte para SAM 2 opcional.
+* Mejoras en el exportador GLB UV.
+* Generador de CLI integrado.
+* Reestructuración total de la documentación.
 
-Esta versión consolida el flujo público local: separación visual, extracción UV, agrupación semántica revisable y distribución del add-on Blender. La fuente de verdad de versión es el paquete Python.
-
-Los comandos `run`, `glb`, `install`, `semantic-3d` y `semantic-models` siguen disponibles como alias ocultos durante una versión. Los comandos públicos equivalentes son `split`, `extract`, `setup`, `group-3d` y `models`.
-
-No hay publicación automática a PyPI. Las notas de una release deben coincidir con la etiqueta `vX.Y.Z` y con `CHANGELOG.md`.
+## v0.1.0
+* Lanzamiento inicial. Segmentación por transparencia.

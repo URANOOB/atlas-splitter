@@ -1,12 +1,15 @@
-# Primera extracción GLB
+# Primer GLB
 
-## Requisitos
+Si además de la imagen tienes un modelo 3D GLB/glTF que usa ese atlas, puedes extraer las texturas guiándote por la geometría real.
 
-Un GLB/glTF local y, cuando no esté embebido, su atlas. Instala Geometry una vez.
+1. Asegúrate de haber instalado los extras de geometría:
+   ```text
+   atlas-splitter setup geometry
+   ```
+2. Ejecuta la extracción vinculando el modelo y la imagen:
+   ```text
+   atlas-splitter extract modelo.glb --atlas textura.png --output resultado_glb
+   ```
+3. El resultado no solo incluirá las piezas de textura, sino manifiestos que mapean cada imagen extraída a la malla original y a sus coordenadas UV.
 
-```text
-atlas-splitter setup geometry
-atlas-splitter extract modelo.glb --atlas atlas.webp --output resultados
-```
-
-Se genera un manifiesto UV y un script para Blender. Si falta Geometry, el comando muestra `atlas-splitter setup geometry`; no descarga nada durante la extracción.
+Lee la guía de [Extracción GLB y UV](../guides/glb-uv-extraction.md) para más opciones.

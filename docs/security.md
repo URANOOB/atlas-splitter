@@ -1,7 +1,13 @@
 # Seguridad y privacidad
 
-Atlas Splitter procesa imágenes, manifiestos y modelos en la máquina local. `split`, `extract`, `semantic`, reportes y documentación no descargan checkpoints. Las únicas operaciones de red previstas son instalaciones y descargas explícitas de modelos.
+Atlas Splitter procesa todos los archivos de manera **local**. Aunque priorizamos la privacidad, la herramienta no puede garantizar la inmunidad absoluta ante vectores de ataque en formatos complejos.
 
-Los manifiestos no pueden usar rutas absolutas ni escapar con `..`. Las rutas de piezas se resuelven dentro del directorio de resultado; el ZIP no sigue enlaces simbólicos hacia fuera.
+* **Procesamiento local:** Los comandos `split` y `extract` nunca acceden a la red.
+* **Cuándo se usa Internet:** Únicamente al ejecutar `pipx install` y `models download`.
+* **Modelos descargados:** Se guardan en el caché seguro de tu usuario local.
+* **Manifiestos no confiables:** Si recibes un `.json` o un `.glb` de terceros, inspecciónalo. Aunque el parser valida esquemas, archivos creados con intenciones maliciosas podrían intentar desbordamientos de memoria en bibliotecas subyacentes.
+* **Rutas confinadas:** Atlas Splitter busca prevenir escrituras fuera del directorio `--output`.
+* **Archivos recibidos de terceros:** Úsalos bajo tu propia responsabilidad.
+* **Reporte HTML:** Es estático y autocontenido. No ejecuta código de rastreo.
 
-No subas atlas privados, GLB ni manifiestos a issues públicos. Para comunicar una vulnerabilidad, sigue el canal indicado en el archivo `SECURITY.md` del repositorio.
+Para reportar vulnerabilidades, contáctanos a través del correo listado en el repositorio original.

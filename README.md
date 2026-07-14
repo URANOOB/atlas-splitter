@@ -1,62 +1,80 @@
 # Atlas Splitter
 
-Separa atlas de texturas localmente para editarlos como piezas 2D o extraer regiones UV exactas desde un GLB/glTF.
+![License](https://img.shields.io/badge/license-MIT-blue) ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue) ![Status](https://img.shields.io/badge/status-active-success)
 
-## De atlas a piezas editables
+Herramienta CLI local para separar regiones visuales de atlas de texturas 2D y recuperar coordenadas UV de archivos GLB/glTF.
 
-| Atlas original | Pieza extraída |
-| --- | --- |
-| ![Atlas original con la casa](docs/examples/atlas-original.png) | ![Pieza de techo extraída con transparencia](docs/examples/atlas-extraido.png) |
+![Captura principal](https://raw.githubusercontent.com/URANOOB/atlas-splitter/main/docs/assets/screenshot.webp)
 
-El flujo conserva la transparencia y deja cada región lista para edición 2D.
+## Flujos de trabajo
 
-![Objetos separados en Blender](docs/assets/semantic-first-house-separated.png)
-
-La extracción semántica también deja objetos separados para revisar y ajustar en Blender.
-
-| Tengo | Debo usar | Precisión |
+| Tengo | Debo usar | Resultado |
 | --- | --- | --- |
-| Atlas solamente | `split` | Aproximada |
-| Atlas y GLB/glTF | `extract` | Basada en UV |
-| Atlas sin GLB y deseo nombres | `semantic` | Inferencia visual |
+| Sólo un atlas | `split` | Piezas visuales |
+| Atlas y GLB/glTF | `extract` | Regiones por UV |
+| Atlas y deseo nombres | `semantic` | Grupos inferidos |
+| Resultado a corregir | `review` | Revisión manual |
+| Proyecto para Blender | `blender-addon` | Scripts para Blender |
 
-## Instalación
+## Instalación rápida
 
 ```text
-pipx install git+https://github.com/URANOOB/atlas-splitter.git
-atlas-splitter doctor
+pipx install atlas-splitter
 ```
 
-Las funciones extra se instalan desde cualquier carpeta, previa confirmación. Ningún modelo se descarga durante un procesamiento.
-
+Para soporte de geometría (GLB) e inteligencia artificial:
 ```text
-atlas-splitter setup geometry
-atlas-splitter setup ai
 atlas-splitter setup all
 ```
 
-## Tres comandos
+### Windows portable
+Si no puedes instalar Python, descarga el `.zip` ejecutable desde *Releases* y úsalo en cualquier PC sin conexión.
+
+## 3 Comandos básicos
+
+1. **Separar visualmente:**
+   ```text
+   atlas-splitter split atlas.webp --output resultados
+   ```
+
+2. **Extraer usando modelo 3D:**
+   ```text
+   atlas-splitter extract modelo.glb --atlas atlas.webp --output resultados
+   ```
+
+3. **Ver resultados interactivos:**
+   ```text
+   atlas-splitter preview resultados/atlas
+   ```
+
+## Resultado
+
+Al ejecutar cualquiera de los comandos anteriores, Atlas Splitter creará una carpeta con todas las subimágenes cortadas, un archivo manifiesto JSON detallando sus posiciones, y un reporte HTML interactivo para previsualizarlas localmente.
+
+## Blender
+
+Exporta el add-on oficial para importar automáticamente los archivos segmentados y reconstruir tu escena.
 
 ```text
-atlas-splitter split atlas.webp --output resultados
-atlas-splitter extract modelo.glb --atlas atlas.webp --output resultados
-atlas-splitter semantic atlas.webp --output resultados
+atlas-splitter blender-addon export
 ```
 
-`split` genera `png/`, `masks/`, `psd/`, `manifest.json`, un reporte HTML y un ZIP. `extract` genera manifiestos UV y scripts de Blender. `semantic` usa Qwen3-VL local sólo si se descargó explícitamente:
+## Privacidad
 
-```text
-atlas-splitter models download qwen3-vl-2b
-```
+Todo el procesamiento, incluyendo modelos de IA complejos, se ejecuta de forma **100% local** en tu ordenador. Tus texturas y modelos 3D nunca abandonan tu máquina.
 
-## Límites
+## Limitaciones
 
-La segmentación visual es una aproximación y los nombres de IA requieren revisión. Sin GLB/glTF no hay geometría ni coordenadas UV, así que no puede reconstruirse fielmente el objeto 3D.
+- Consumo elevado de memoria RAM para atlas superiores a 8K.
+- Soporte para GLB estandarizado sin compresión Draco.
+- La segmentación visual depende del canal de transparencia.
 
 ## Documentación
 
-Guías de [instalación](docs/getting-started/installation.md), [primer atlas](docs/getting-started/first-split.md), [extracción GLB](docs/getting-started/first-glb-extraction.md), [Blender](docs/guides/blender.md) y [problemas](docs/troubleshooting/installation.md).
+[Visita la documentación oficial](https://uranoob.github.io/atlas-splitter/) para guías detalladas, esquemas de JSON, y resolución de problemas comunes.
 
-## Estado y licencia
+## Estado
+Bajo desarrollo activo. Preparado para producción en flujos de trabajo de modificación de assets.
 
-Primera versión pública estable en preparación. Ejecuta `python -m pytest`, `python -m ruff check .`, `python -m mypy` y `python -m build` antes de publicar. Licencia [MIT](LICENSE).
+## Licencia
+Distribuido bajo licencia MIT. Ver archivo `LICENSE`.

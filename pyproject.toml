@@ -7,7 +7,7 @@ name = "atlas-splitter"
 dynamic = ["version"]
 description = "CLI local para separar regiones visuales de atlas de texturas."
 readme = "README.md"
-requires-python = ">=3.11,<3.14"
+requires-python = ">=3.11,<3.15"
 license = { text = "MIT" }
 authors = [{ name = "Atlas Splitter contributors" }]
 dependencies = [

@@ -1,24 +1,10 @@
-# Problemas de Blender
+# Blender
 
-## Síntoma
-
-Blender no encuentra el add-on, no carga un manifiesto o no crea colecciones.
-
-## Causa probable
-
-Se eligió una carpeta en vez del ZIP, falta `rebuild_scene.py` o el manifiesto tiene versión desconocida.
-
-## Comprobación
-
+**Síntoma:** El Add-on no aparece tras instalar el ZIP.
+**Causa probable:** Estás usando una versión de Blender antigua (< 4.0) o extrajiste el ZIP.
+**Comprobación:** Mira la pestaña de consola de Blender al instalar.
+**Solución:** Actualiza a Blender 4.0+ y no descomprimas el ZIP antes de instalarlo en Blender.
+**Comando de diagnóstico:** 
 ```text
-atlas-splitter blender-addon info
-atlas-splitter blender-addon export --output Descargas
+atlas-splitter blender-addon --help
 ```
-
-## Solución
-
-En Blender 4.x usa Preferences → Add-ons → Install y selecciona `atlas_splitter_blender.zip`. Actívalo y carga `project.json`, `objects_manifest.json` o `manifest.json`. El panel rechaza JSON corrupto y versiones incompatibles.
-
-## Código y siguiente paso
-
-Mira la consola de Blender para el error completo. Regenera `extract` si falta el script de reconstrucción.

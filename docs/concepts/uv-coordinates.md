@@ -1,7 +1,7 @@
 # Coordenadas UV
 
-UV es un mapa entre vértices de una malla 3D y píxeles de una textura. U y V normalmente están entre 0 y 1: U va de izquierda a derecha, V va de abajo arriba en glTF.
+En los gráficos 3D, una malla (mesh) es sólo forma. Para darle color, necesita saber qué parte de la imagen va en cada triángulo.
 
-`extract` rasteriza esas coordenadas para obtener regiones reales del atlas. El resultado puede usar repetición, espejo, transformaciones de textura o varios materiales; por eso se debe inspeccionar el GLB antes de editar.
+**U** y **V** son simplemente X e Y, pero en el espacio 2D de una textura. Representan coordenadas (generalmente de 0.0 a 1.0).
 
-Una imagen sin GLB no permite recuperar UV. `split` y `semantic` son útiles para edición 2D, pero no pueden inventar caras ni una malla exacta.
+En archivos como GLB, esto suele guardarse en un atributo de geometría llamado `TEXCOORD_0`. Atlas Splitter usa esta información durante el proceso de `extract` para saber exactamente dónde recortar en lugar de adivinar mediante transparencia.
