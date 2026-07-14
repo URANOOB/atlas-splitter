@@ -54,6 +54,7 @@ def test_preview_regenerates_a_local_report(tmp_path) -> None:
 def test_new_modes_expose_help() -> None:
     _help(["glb", "--help"])
     _help(["extract", "--help"])
+    _help(["group", "--help"])
     _help(["split", "--help"])
     _help(["semantic", "--help"])
     _help(["semantic-3d", "--help"])

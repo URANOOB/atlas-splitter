@@ -17,7 +17,7 @@ from atlas_splitter.blender.script_writer import (
     write_object_rebuild_script,
     write_single_object_rebuild_script,
 )
-from atlas_splitter.config import apply_cli_overrides, load_config
+from atlas_splitter.config import GroupingConfig, apply_cli_overrides, load_config
 from atlas_splitter.diagnostics import collect_diagnostics, has_critical_failures
 from atlas_splitter.domain import slugify
 from atlas_splitter.exceptions import (
@@ -344,6 +344,30 @@ def apply_manual_review(review_file: Annotated[Path, typer.Argument(help="Archiv
 
 
 @app.command()
+def group(
+    output: Annotated[Path, typer.Argument(help="Directorio visual ya extraído")],
+    device: Annotated[str, typer.Option(help="auto, cpu, cuda o mps")] = "auto",
+) -> None:
+    """Agrupa una extracción existente con el modelo local, sin reprocesar el atlas."""
+    if not is_semantic_model_downloaded("qwen3-vl-2b"):
+        raise typer.BadParameter("Qwen3-VL local no está instalado; usa semantic-models download explícitamente.")
+    try:
+        config = GroupingConfig.model_validate({"enabled": True, "device": device})
+    except ValidationError as error:
+        raise typer.BadParameter(str(error), param_hint="--device") from error
+    backend = Qwen3VLSemanticGroupingBackend(
+        config.model, config.device, config.minimum_confidence, config.automatic_confidence
+    )
+    try:
+        group_extracted_atlas(output, config, backend)
+    except (SemanticInferenceError, SemanticModelUnavailableError, OSError, ValueError) as error:
+        raise typer.BadParameter(str(error), param_hint="output") from error
+    finally:
+        backend.close()
+    console.print(f"[green]Agrupación creada:[/green] {output / 'semantic_manifest.json'}")
+
+
+@app.command()
 def semantic(
     atlas: Annotated[Path, typer.Argument(help="Atlas local sin GLB")],
     output: Annotated[Path, typer.Option(help="Directorio de resultados")] = Path("outputs"),
@@ -539,8 +563,8 @@ def split(
 def translate_simple_args(arguments: list[str]) -> list[str]:
     """Traduce ``atlas-splitter archivo [salida]`` a la interfaz avanzada."""
     commands = {
-        "apply-review", "doctor", "extract", "glb", "install", "inspect", "models", "preview", "review",
-        "semantic", "semantic-3d", "semantic-models", "run", "split",
+        "apply-review", "doctor", "extract", "glb", "group", "install", "inspect", "models", "preview",
+        "review", "semantic", "semantic-3d", "semantic-models", "run", "split",
     }
     if not arguments or arguments[0] in commands or arguments[0].startswith("-"):
         return arguments
