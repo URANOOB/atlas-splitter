@@ -16,6 +16,8 @@ def test_pipeline_writes_png_masks_and_manifest(tmp_path) -> None:
     config = AppConfig.model_validate({"segmentation": {"min_area": 20}})
     destination = process_image(image_path, tmp_path / "results", config)
     manifest = json.loads((destination / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["schema_version"] == "1.0"
+    assert manifest["capabilities"]["reconstruction_quality"] == "approximate_2d_only"
     assert manifest["final_elements"] == 2
     assert (destination / "png" / "element_001.png").is_file()
     assert (destination / "masks" / "element_002.png").is_file()

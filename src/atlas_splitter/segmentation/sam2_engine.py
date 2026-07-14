@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import gc
+import importlib.util
 from contextlib import nullcontext
 from typing import Protocol
 
@@ -43,8 +45,13 @@ class Sam2Engine:
 
     @property
     def is_available(self) -> bool:
-        """Indica si el checkpoint ya existe; nunca inicia una descarga."""
-        return is_downloaded(self.model_name)
+        """Indica si SAM 2 y su checkpoint local existen; nunca descarga nada."""
+        return importlib.util.find_spec("sam2") is not None and is_downloaded(self.model_name)
+
+    @property
+    def runtime_device(self) -> str:
+        """Dispositivo realmente usado por el generador, no el solicitado."""
+        return self._runtime_device
 
     def _load_generator(self) -> object:
         if self._generator is not None:
@@ -113,3 +120,14 @@ class Sam2Engine:
                 )
             )
         return candidates
+
+    def close(self) -> None:
+        """Libera SAM 2 y caché CUDA; es seguro si nunca se cargó."""
+        self._generator = None
+        try:
+            import torch
+        except ImportError:
+            return
+        if torch.cuda.is_available():
+            gc.collect()
+            torch.cuda.empty_cache()
