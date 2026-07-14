@@ -147,15 +147,22 @@ def main():
     selected = [
         item for item in data["objects"]
         if (TARGET_OBJECT_ID is None or item["object_id"] == TARGET_OBJECT_ID)
-        and (TARGET_ATLAS_PATH is None or item["atlas_path"] == TARGET_ATLAS_PATH)
+        and (
+            TARGET_ATLAS_PATH is None
+            or TARGET_ATLAS_PATH in item.get("atlas_paths", [item["atlas_path"]])
+        )
     ]
     for item in selected:
         obj = imported.get(item["node_name"])
         if obj is None or obj.type != "MESH":
             print("atlas-splitter: no se encontró nodo", item["node_name"])
             continue
+        atlas_paths = item.get("atlas_paths", [item["atlas_path"]])
+        if len(atlas_paths) != 1:
+            print("atlas-splitter: nodo con varios atlas; conserva materiales importados", item["node_name"])
+            continue
         obj.data.materials.clear()
-        obj.data.materials.append(material_from_atlas(item["object_id"], item["atlas_path"], item["flip_v"]))
+        obj.data.materials.append(material_from_atlas(item["object_id"], atlas_paths[0], item["flip_v"]))
     if TARGET_OBJECT_ID is not None or TARGET_ATLAS_PATH is not None:
         kept_names = {item["node_name"] for item in selected}
         for name, obj in imported.items():

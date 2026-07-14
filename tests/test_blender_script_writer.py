@@ -31,6 +31,8 @@ def test_object_rebuild_script_uses_full_editable_atlas(tmp_path) -> None:
     assert "def local_path(path):" in contents
     assert "TARGET_OBJECT_ID = None" in contents
     assert "Path(local_path(OBJECT_MANIFEST)).read_text" in contents
+    assert "nodo con varios atlas" in contents
+    assert 'item.get("atlas_paths", [item["atlas_path"]])' in contents
     compile(contents, str(destination), "exec")
 
 

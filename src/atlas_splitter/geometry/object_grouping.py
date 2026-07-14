@@ -46,7 +46,7 @@ def write_object_manifest(destination: Path, source_glb: Path, atlases: list[Exp
         first_atlas, first_element = entries[0]
         atlas_paths = {str(atlas.atlas_path.resolve()) for atlas, _ in entries}
         if len(atlas_paths) != 1:
-            raise ValueError(f"El nodo {node_index} usa más de un atlas externo; requiere una política explícita.")
+            LOGGER.warning("El nodo %s usa varios atlas; se conservan como asociaciones separadas.", node_index)
         node_name = first_element.node_path[-1] if first_element.node_path else f"node_{node_index}"
         object_id = f"object_{hashlib.sha256(f'{node_index}:{node_name}'.encode()).hexdigest()[:16]}"
         parts = [
@@ -79,7 +79,8 @@ def write_object_manifest(destination: Path, source_glb: Path, atlases: list[Exp
                 node_index=node_index,
                 node_name=node_name,
                 node_path=first_element.node_path,
-                atlas_path=next(iter(atlas_paths)),
+                atlas_path=next(iter(atlas_paths)) if len(atlas_paths) == 1 else None,
+                atlas_paths=sorted(atlas_paths),
                 flip_v=first_atlas.flip_v,
                 parts=parts,
                 associations=associations,

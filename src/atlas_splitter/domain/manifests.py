@@ -69,7 +69,8 @@ class ObjectGroup(BaseModel):
     node_index: int = Field(ge=0)
     node_name: str = Field(min_length=1)
     node_path: list[str] = Field(default_factory=list)
-    atlas_path: str = Field(min_length=1)
+    atlas_path: str | None = Field(default=None, min_length=1)
+    atlas_paths: list[str] = Field(default_factory=list)
     flip_v: bool = False
     parts: list[ObjectTexturePart] = Field(default_factory=list)
     associations: list[AtlasAssociationRecord] = Field(default_factory=list)
