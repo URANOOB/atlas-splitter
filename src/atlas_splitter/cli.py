@@ -29,6 +29,7 @@ from atlas_splitter.exceptions import (
 )
 from atlas_splitter.geometry.glb_exporter import GroupBy, export_glb
 from atlas_splitter.geometry.glb_loader import load_gltf
+from atlas_splitter.geometry.model_inspector import inspect_model
 from atlas_splitter.geometry.object_grouping import ExportedAtlas, write_object_manifest
 from atlas_splitter.geometry.texture_association import load_atlas_bindings, resolve_external_atlases
 from atlas_splitter.installer import InstallationError, create_isolated_environment, install_runtime
@@ -580,13 +581,44 @@ def download_registered_semantic_model(
 
 
 @app.command()
-def inspect(archive: Annotated[Path, typer.Argument(help="ZIP generado por atlas-split")]) -> None:
-    """Muestra los manifiestos contenidos en un ZIP de resultados."""
+def inspect(
+    source: Annotated[Path, typer.Argument(help="Modelo GLB/glTF local o ZIP heredado de atlas-split")],
+    format: Annotated[str, typer.Option("--format", help="text o json (sólo para GLB/glTF)")] = "text",
+) -> None:
+    """Inspecciona un modelo GLB/glTF; los ZIP antiguos conservan su vista heredada."""
     import json
     import zipfile
 
+    if format not in {"text", "json"}:
+        raise typer.BadParameter("--format debe ser text o json")
+    if source.suffix.lower() in {".glb", ".gltf"}:
+        try:
+            inspection = inspect_model(load_gltf(source))
+        except (GltfLoadError, OSError, ValueError) as error:
+            raise typer.BadParameter(str(error), param_hint="source") from error
+        if format == "json":
+            console.print_json(inspection.model_dump_json(indent=2))
+            return
+        console.print(f"Archivo: {inspection.file}")
+        console.print(f"Nodos: {inspection.nodes}")
+        console.print(f"Mallas: {inspection.meshes}")
+        console.print(f"Primitivas: {inspection.primitives}")
+        console.print(f"Materiales: {inspection.materials}")
+        console.print(f"Texturas: {inspection.textures}")
+        console.print(f"UV sets disponibles: {', '.join(inspection.uv_sets) or 'ninguno'}")
+        console.print(f"Animaciones: {inspection.animations}")
+        console.print(f"Compresión Draco: {'sí' if inspection.draco_compression else 'no'}")
+        for number, candidate in enumerate(inspection.candidates, start=1):
+            console.print(f"\n[{number}] Nodo: {candidate.node_name} ({candidate.node_index})")
+            console.print(f"    Malla: {candidate.mesh_index}")
+            console.print(f"    Primitivas: {candidate.primitive_count}")
+            console.print(f"    Materiales: {', '.join(candidate.material_names) or 'ninguno'}")
+            console.print(f"    UV: {', '.join(candidate.uv_sets) or 'ninguno'}")
+        return
+    if format != "text":
+        raise typer.BadParameter("--format json requiere un archivo GLB o glTF", param_hint="source")
     try:
-        with zipfile.ZipFile(archive) as contents:
+        with zipfile.ZipFile(source) as contents:
             manifests = [name for name in contents.namelist() if name.endswith("manifest.json")]
             if not manifests:
                 raise ValueError("El ZIP no contiene manifest.json")
@@ -594,4 +626,4 @@ def inspect(archive: Annotated[Path, typer.Argument(help="ZIP generado por atlas
                 manifest = json.loads(contents.read(name))
                 console.print(f"{name}: {manifest['final_elements']} elementos; fuente {manifest['source_file']}")
     except (OSError, ValueError, zipfile.BadZipFile, KeyError) as error:
-        raise typer.BadParameter(str(error), param_hint="archive") from error
+        raise typer.BadParameter(str(error), param_hint="source") from error

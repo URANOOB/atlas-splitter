@@ -1,6 +1,7 @@
 from typer.testing import CliRunner
 
 from atlas_splitter.cli import app, interactive_arguments, translate_simple_args
+from atlas_splitter.geometry.model_inspector import ModelInspection
 
 runner = CliRunner()
 
@@ -22,6 +23,33 @@ def test_new_modes_expose_help() -> None:
     _help(["glb", "--help"])
     _help(["semantic", "--help"])
     _help(["semantic-3d", "--help"])
+
+
+def test_inspect_glb_prints_text_and_json(monkeypatch, tmp_path) -> None:
+    source = tmp_path / "model.glb"
+    source.touch()
+    inspection = ModelInspection(
+        file=str(source),
+        nodes=1,
+        meshes=1,
+        primitives=1,
+        materials=1,
+        textures=1,
+        uv_sets=["TEXCOORD_0"],
+        animations=0,
+        draco_compression=False,
+        candidates=[],
+    )
+    monkeypatch.setattr("atlas_splitter.cli.load_gltf", lambda _path: object())
+    monkeypatch.setattr("atlas_splitter.cli.inspect_model", lambda _loaded: inspection)
+
+    text = runner.invoke(app, ["inspect", str(source)])
+    structured = runner.invoke(app, ["inspect", str(source), "--format", "json"])
+
+    assert text.exit_code == 0
+    assert "Nodos: 1" in text.stdout
+    assert structured.exit_code == 0
+    assert '"uv_sets": [' in structured.stdout
 
 
 def test_debug_is_a_global_cli_option() -> None:
