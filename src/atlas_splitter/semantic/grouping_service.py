@@ -171,18 +171,28 @@ def _organize_semantic_output(
     artifacts: dict[str, dict[str, object]],
 ) -> None:
     """Copia artefactos a rutas seguras; los PNG y PSD originales nunca se eliminan."""
+    assigned: set[str] = set()
     for group in result.groups:
+        if group.status == "rejected":
+            continue
         root = destination / ("objects" if group.status == "accepted" else "uncertain") / group.group_id
         root.mkdir(parents=True, exist_ok=True)
         copied: list[str] = []
         for piece_id in group.piece_ids:
+            if piece_id in assigned:
+                raise ValueError(f"La pieza {piece_id} aparece en más de una categoría semántica.")
             piece = pieces[piece_id]
             target = root / piece.png_path.name
             shutil.copy2(piece.png_path, target)
             copied.append(str(target.relative_to(destination)))
+            assigned.add(piece_id)
         artifacts[group.group_id]["pieces"] = copied
     unassigned = destination / "unassigned"
     unassigned.mkdir(exist_ok=True)
-    for piece_id in result.unassigned_piece_ids:
+    rejected_piece_ids = (piece_id for group in result.groups if group.status == "rejected" for piece_id in group.piece_ids)
+    for piece_id in dict.fromkeys([*result.unassigned_piece_ids, *rejected_piece_ids]):
+        if piece_id in assigned:
+            raise ValueError(f"La pieza {piece_id} aparece asignada y sin asignar.")
         piece = pieces[piece_id]
         shutil.copy2(piece.png_path, unassigned / piece.png_path.name)
+        assigned.add(piece_id)

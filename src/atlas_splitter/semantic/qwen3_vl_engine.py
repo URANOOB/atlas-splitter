@@ -14,6 +14,7 @@ from atlas_splitter.semantic.response_parser import SemanticResponseParseError, 
 from atlas_splitter.semantic.types import GroupingContext, GroupingResult
 from atlas_splitter.semantic.validator import SemanticResponseValidationError, validate_groups
 from atlas_splitter.semantic_models.manager import is_semantic_model_downloaded, semantic_model_path
+from atlas_splitter.runtime import resolve_device
 
 LOGGER = logging.getLogger(__name__)
 
@@ -53,11 +54,7 @@ class Qwen3VLSemanticGroupingBackend(SemanticGroupingBackend):
         except ImportError as error:
             raise SemanticModelUnavailableError('Instale el extra opcional: pip install -e ".[semantic]"') from error
         model_path = semantic_model_path(self.model_name)
-        selected = "cuda" if self.device == "auto" and torch.cuda.is_available() else self.device
-        if selected == "cuda" and not torch.cuda.is_available():
-            raise SemanticModelUnavailableError(
-                "Se solicitó CUDA para agrupación semántica, pero CUDA no está disponible."
-            )
+        selected = resolve_device(self.device)
         dtype = torch.float32
         if selected == "cuda":
             dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16

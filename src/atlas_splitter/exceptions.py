@@ -13,6 +13,10 @@ class ModelUnavailableError(AtlasSplitterError):
     """El modelo solicitado no está instalado o no tiene checkpoint local."""
 
 
+class DeviceResolutionError(AtlasSplitterError):
+    """El dispositivo solicitado no puede usarse en este equipo."""
+
+
 class Sam2InferenceError(AtlasSplitterError):
     """SAM 2 no pudo completar una inferencia en el dispositivo elegido."""
 
