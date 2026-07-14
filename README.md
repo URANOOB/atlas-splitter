@@ -124,6 +124,7 @@ python -m mypy
 - [Salida generada](docs/output-structure.md)
 - [Flujo Blender](docs/blender-workflow.md)
 - [Agrupación semántica](docs/semantic-grouping.md)
+- [Instalación Linux y macOS](docs/linux-macos-installation.md)
 - [Solución de problemas](docs/troubleshooting.md)
 
 ## Privacidad y límites
