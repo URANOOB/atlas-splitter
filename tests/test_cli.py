@@ -106,11 +106,17 @@ def test_install_help_is_available_without_installing_dependencies() -> None:
     assert "virtualenv" in result.stdout
 
 
-def test_interactive_atlas_mode_creates_a_yaml_and_simple_run_args(tmp_path, monkeypatch) -> None:
-    answers = iter([False, str(tmp_path / "atlas.webp"), str(tmp_path / "output"), 6])
-    monkeypatch.setattr("atlas_splitter.cli.typer.confirm", lambda *args, **kwargs: next(answers))
+def test_interactive_atlas_mode_returns_simple_reproducible_run_args(tmp_path, monkeypatch) -> None:
+    source = tmp_path / "atlas.webp"
+    source.touch()
+    answers = iter(["1", str(source), str(tmp_path / "output"), 6])
+    monkeypatch.setattr("atlas_splitter.cli.typer.confirm", lambda *args, **kwargs: True)
     monkeypatch.setattr("atlas_splitter.cli.typer.prompt", lambda *args, **kwargs: next(answers))
     arguments = interactive_arguments(tmp_path)
-    assert arguments[:2] == ["run", str(tmp_path / "atlas.webp")]
+    assert arguments[:2] == ["run", str(source)]
     assert arguments[-1] == "6"
-    assert (tmp_path / "atlas-splitter.yaml").is_file()
+
+
+def test_interactive_menu_can_run_doctor_without_requesting_paths(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr("atlas_splitter.cli.typer.prompt", lambda *args, **kwargs: "3")
+    assert interactive_arguments(tmp_path) == ["doctor"]

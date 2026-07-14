@@ -16,7 +16,7 @@ from atlas_splitter.blender.script_writer import (
     write_object_rebuild_script,
     write_single_object_rebuild_script,
 )
-from atlas_splitter.config import apply_cli_overrides, load_config, write_default_config
+from atlas_splitter.config import apply_cli_overrides, load_config
 from atlas_splitter.diagnostics import collect_diagnostics, has_critical_failures
 from atlas_splitter.domain import slugify
 from atlas_splitter.exceptions import (
@@ -68,30 +68,75 @@ def _planned(command: str) -> None:
 
 
 def interactive_arguments(cwd: Path) -> list[str]:
-    """Recoge sólo las decisiones necesarias y devuelve argumentos CLI reproducibles."""
-    has_glb = typer.confirm("¿Tienes un archivo GLB/glTF con geometría y UV?", default=False)
-    if has_glb:
-        model = Path(typer.prompt("Ruta del archivo GLB/glTF")).expanduser()
-        atlas_directory = Path(typer.prompt("Carpeta que contiene los atlas WEBP")).expanduser()
-        output = Path(typer.prompt("Carpeta para los resultados", default=str(cwd / "outputs"))).expanduser()
-        draco = cwd / "draco" / "gltf"
-        console.print(f"[yellow]Si el GLB usa Draco, se necesita el decodificador local en {draco}.[/yellow]")
-        typer.confirm("¿Deseas continuar con la comprobación local de Draco?", default=True, abort=True)
-        return [
-            "glb",
-            str(model),
-            "--atlas-dir",
-            str(atlas_directory),
-            "--output",
-            str(output),
-            "--allow-unbound-atlas",
-        ]
-    source = Path(typer.prompt("Ruta de un atlas WEBP o una carpeta de atlas")).expanduser()
-    output = Path(typer.prompt("Carpeta para los resultados", default=str(cwd / "outputs"))).expanduser()
+    """Guía local con rutas validadas y devuelve un comando reproducible."""
+    while True:
+        console.print("\n[bold]Atlas Splitter[/bold] — un atlas es una imagen con varias texturas.")
+        choice = typer.prompt(
+            "Elige: 1) atlas 2D, 2) atlas + GLB/UV, 3) doctor, 4) modelos locales",
+            default="1",
+        ).strip()
+        if choice == "3":
+            return ["doctor"]
+        if choice == "4":
+            return ["models", "list"]
+        if choice not in {"1", "2"}:
+            console.print("[yellow]Elige 1, 2, 3 o 4.[/yellow]")
+            continue
+        if choice == "2":
+            arguments = _interactive_glb_arguments(cwd)
+        else:
+            arguments = _interactive_atlas_arguments(cwd)
+        if arguments is None:
+            console.print("[yellow]Volviste al menú principal.[/yellow]")
+            continue
+        console.print("\n[bold]Resumen antes de ejecutar[/bold]")
+        console.print(f"[cyan]Comando reproducible:[/cyan] atlas-splitter {' '.join(arguments)}")
+        if typer.confirm("¿Ejecutar este comando?", default=True):
+            return arguments
+
+
+def _interactive_atlas_arguments(cwd: Path) -> list[str] | None:
+    source = _prompt_existing_path("Ruta de un atlas WEBP o carpeta (vacío = atrás)", file_or_directory=True)
+    if source is None:
+        return None
+    output = Path(typer.prompt("Carpeta de salida", default=str(cwd / "outputs"))).expanduser()
     padding = typer.prompt("Píxeles extra para recuperar bordes", default=4, type=int)
-    config = write_default_config(cwd / "atlas-splitter.yaml")
-    console.print(f"[cyan]Configuración editable:[/cyan] {config}")
-    return ["run", str(source), "--output", str(output), "--config", str(config), "--calibration-pixels", str(padding)]
+    return ["run", str(source), "--output", str(output), "--calibration-pixels", str(padding)]
+
+
+def _interactive_glb_arguments(cwd: Path) -> list[str] | None:
+    model = _prompt_existing_path("Ruta del archivo GLB/glTF (vacío = atrás)", suffixes={".glb", ".gltf"})
+    if model is None:
+        return None
+    atlas_directory = _prompt_existing_path("Carpeta de atlas (vacío = atrás)", directory=True)
+    if atlas_directory is None:
+        return None
+    output = Path(typer.prompt("Carpeta de salida", default=str(cwd / "outputs"))).expanduser()
+    console.print("[dim]UV indica qué zona del atlas usa cada cara del modelo; no se modifica el GLB.[/dim]")
+    console.print(f"[yellow]Si usa Draco, se comprobará el decodificador local en {cwd / 'draco' / 'gltf'}.[/yellow]")
+    console.print("Al terminar, abre output/blender/rebuild_scene.py en Blender y ejecútalo desde Scripting.")
+    return ["glb", str(model), "--atlas-dir", str(atlas_directory), "--output", str(output)]
+
+
+def _prompt_existing_path(
+    label: str,
+    *,
+    file_or_directory: bool = False,
+    directory: bool = False,
+    suffixes: set[str] | None = None,
+) -> Path | None:
+    """Pide una ruta local; una entrada vacía permite retroceder sin error."""
+    while True:
+        raw = typer.prompt(label, default="").strip()
+        if not raw:
+            return None
+        path = Path(raw).expanduser()
+        valid = (file_or_directory and (path.is_file() or path.is_dir())) or (directory and path.is_dir()) or (
+            suffixes is not None and path.is_file() and path.suffix.lower() in suffixes
+        )
+        if valid:
+            return path
+        console.print(f"[red]Ruta no válida: {path}. Revisa que exista y vuelve a intentarlo.[/red]")
 
 
 @app.command()
