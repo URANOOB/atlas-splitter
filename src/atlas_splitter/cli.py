@@ -24,6 +24,7 @@ from atlas_splitter.exceptions import (
     AtlasSplitterError,
     GltfLoadError,
     InputValidationError,
+    InvalidReviewError,
     PrimitiveDecodeError,
     SemanticInferenceError,
     SemanticModelUnavailableError,
@@ -42,6 +43,7 @@ from atlas_splitter.models.manager import is_downloaded
 from atlas_splitter.models.registry import MODELS, get_model
 from atlas_splitter.pipeline import process_image
 from atlas_splitter.reporting.html_report import generate_html_report
+from atlas_splitter.review import apply_review, create_review_template
 from atlas_splitter.segmentation.sam2_engine import Sam2Engine
 from atlas_splitter.semantic.grouping_service import group_extracted_atlas
 from atlas_splitter.semantic.qwen3_vl_engine import Qwen3VLSemanticGroupingBackend
@@ -311,6 +313,26 @@ def preview(output: Annotated[Path, typer.Argument(help="Directorio de una ejecu
     console.print(f"[green]Reporte local:[/green] {report}")
 
 
+@app.command("review")
+def review(output: Annotated[Path, typer.Argument(help="Directorio de una ejecución existente")]) -> None:
+    """Crea la plantilla review.json sin ejecutar inferencia otra vez."""
+    try:
+        template = create_review_template(output)
+    except InvalidReviewError as error:
+        raise typer.BadParameter(str(error), param_hint="output") from error
+    console.print(f"[green]Revisión creada:[/green] {template}")
+
+
+@app.command("apply-review")
+def apply_manual_review(review_file: Annotated[Path, typer.Argument(help="Archivo review.json editable")]) -> None:
+    """Aplica grupos manuales sin modificar los PNG ni las máscaras originales."""
+    try:
+        applied = apply_review(review_file)
+    except InvalidReviewError as error:
+        raise typer.BadParameter(str(error), param_hint="review_file") from error
+    console.print(f"[green]Revisión aplicada:[/green] {applied}")
+
+
 @app.command()
 def semantic(
     atlas: Annotated[Path, typer.Argument(help="Atlas local sin GLB")],
@@ -497,7 +519,10 @@ def run(
 
 def translate_simple_args(arguments: list[str]) -> list[str]:
     """Traduce ``atlas-splitter archivo [salida]`` a la interfaz avanzada."""
-    commands = {"doctor", "glb", "install", "inspect", "models", "semantic", "semantic-3d", "semantic-models", "run"}
+    commands = {
+        "apply-review", "doctor", "glb", "install", "inspect", "models", "preview", "review", "semantic",
+        "semantic-3d", "semantic-models", "run",
+    }
     if not arguments or arguments[0] in commands or arguments[0].startswith("-"):
         return arguments
     translated = ["run", arguments[0]]

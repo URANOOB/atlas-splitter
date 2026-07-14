@@ -81,3 +81,11 @@ class DracoDecoderUnavailableError(PrimitiveDecodeError):
 
 class DracoDecodeError(PrimitiveDecodeError):
     """El decodificador local Draco rechazo una primitiva comprimida."""
+
+
+class InvalidReviewError(AtlasSplitterError):
+    """La revisión manual no cubre las piezas de forma segura."""
+
+    code = "AS-REVIEW-001"
+    probable_cause = "Hay piezas inexistentes, duplicadas o sin asignar en review.json."
+    solution = "Incluya cada pieza exactamente una vez y use nombres de grupo seguros."
