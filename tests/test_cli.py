@@ -110,6 +110,12 @@ def test_install_help_is_available_without_installing_dependencies() -> None:
     _help(["install", "--help"])
 
 
+def test_doctor_uses_ascii_readiness_indicators() -> None:
+    result = runner.invoke(app, ["doctor"])
+    assert result.exit_code in {0, 1}
+    assert "[OK] Extraer atlas con GLB y UV" in result.stdout
+
+
 def test_interactive_atlas_mode_returns_simple_reproducible_run_args(tmp_path, monkeypatch) -> None:
     source = tmp_path / "atlas.webp"
     source.touch()

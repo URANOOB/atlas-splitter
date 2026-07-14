@@ -154,9 +154,9 @@ def doctor() -> None:
     console.print(table)
     ready = {check.name for check in checks if check.ok}
     console.print("\n[bold]Tu equipo está listo para:[/bold]")
-    console.print(f"{'✓' if 'Geometría glTF' in ready else '✗'} Extraer atlas con GLB y UV")
-    console.print(f"{'✓' if 'OpenCV' in ready else '✗'} Separar atlas con procesamiento clásico")
-    console.print(f"{'✓' if 'Qwen3-VL local' in ready else '✗'} Usar Qwen3-VL local")
+    console.print(f"{'[OK]' if 'Geometría glTF' in ready else '[X]'} Extraer atlas con GLB y UV")
+    console.print(f"{'[OK]' if 'OpenCV' in ready else '[X]'} Separar atlas con procesamiento clásico")
+    console.print(f"{'[OK]' if 'Qwen3-VL local' in ready else '[X]'} Usar Qwen3-VL local")
     if has_critical_failures(checks):
         raise typer.Exit(code=1)
 
